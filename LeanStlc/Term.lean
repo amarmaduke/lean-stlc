@@ -8,13 +8,13 @@ inductive Ty : Type where
 notation "⊤" => Ty.base
 infixr:40 " -t> " => Ty.arrow
 
-protected def Ty.repr (a : Ty) (p : Nat): Std.Format :=
+protected def Ty.repr (a : Ty) (p : Nat) : Std.Format :=
   match a with
   | .base => "⊤"
   | .arrow .base B => Ty.repr .base p ++ " -> " ++ Ty.repr B p
   | .arrow A B => "(" ++ Ty.repr A p ++ ") -> " ++ Ty.repr B p
 
-instance instRepr_Ty : Repr Ty where
+instance : Repr Ty where
   reprPrec := Ty.repr
 
 inductive Term where
@@ -22,13 +22,13 @@ inductive Term where
 | app : Term -> Term -> Term
 | lam : Ty -> Term -> Term
 
-protected def Term.repr (a : Term) (p : Nat): Std.Format :=
+protected def Term.repr (a : Term) (p : Nat) : Std.Format :=
   match a with
   | .var x => "#" ++ Nat.repr x
   | .app f a => "(" ++ Term.repr f p ++ " " ++ Term.repr a p ++ ")"
   | .lam _ t => "(λ " ++ Term.repr t p ++ ")"
 
-instance instRepr_Term : Repr (Term) where
+instance : Repr Term where
   reprPrec := Term.repr
 
 prefix:max "#" => Term.var
