@@ -1,0 +1,16 @@
+name = "lean-stlc"
+version = "0.1.0"
+defaultTargets = ["lean-stlc"]
+
+[[require]]
+name = "lean-subst"
+scope = "amarmaduke"
+git = "https://github.com/amarmaduke/lean-subst"
+rev = "main"
+
+[[lean_lib]]
+name = "LeanStlc"
+
+[[lean_exe]]
+name = "lean-stlc"
+root = "Main"
