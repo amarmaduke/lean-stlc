@@ -1,0 +1,40 @@
+name: Build the project and deploy to GitHub Pages
+
+# Runs the workflow on pushes and pull requests to the main branch.
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch: # Allows manual triggering of the workflow.
+
+# Sets permissions of the `GITHUB_TOKEN` to allow deployment to GitHub Pages.
+permissions:
+  contents: read # Read access to repository contents.
+  id-token: write # Required to upload the site to GitHub Pages.
+  pages: write # Write access to GitHub Pages.
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          fetch-depth: 0 # Fetch all history for all branches and tags.
+      - name: Build lean project
+        uses: leanprover/lean-action@v1
+      - name: Build documentation
+        run: cd docbuild && lake update && lake --version && lake build LeanStlc:docs
+      - name: Upload the site as a GitHub Pages artifact
+        uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4.0.0
+        with:
+          path: docbuild/.lake/build/doc
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4.0.5
