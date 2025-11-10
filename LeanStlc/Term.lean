@@ -50,6 +50,11 @@ instance SubstMap_Term : SubstMap Term where
   smap := smap
 
 @[simp]
+instance HasSimpleVar_Term : HasSimpleVar Term where
+  var := Term.var
+  smap := by solve_simple_var_smap
+
+@[simp]
 theorem subst_var : (#x)[σ] = match σ x with | .re y => #y | .su t => t := by
   unfold Subst.apply; simp [SubstMap.smap]
 
