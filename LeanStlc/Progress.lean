@@ -70,42 +70,41 @@ theorem lam_value :
     cases j; case _ j =>
     apply Or.inl; apply Exists.intro _; rfl
 
-theorem progress : Γ ⊢ t : A -> Value t ∨ (∃ t', t ~> t') := by
-  intro j; induction j
-  case var x T j =>
-    apply Or.inl; apply Value.var
-  case app Γ A B f a j1 j2 ih1 ih2 =>
+theorem progress t : Value t ∨ (∃ t', t ~> t') := by
+  induction t
+  case var x => apply Or.inl; apply Value.var
+  case app f a ih1 ih2 =>
     cases ih1
     case _ ih1 =>
       cases ih2
       case _ ih2 =>
-        have lem := lam_value j1 ih1
-        cases lem
-        case _ lem =>
-          cases lem; case _ b lem =>
-          subst lem; apply Or.inr
-          exists (b[.su a::I])
+        cases f
+        case var x =>
+          apply Or.inl
+          apply Value.app ih1 ih2
+          simp
+        case lam A t =>
+          apply Or.inr
+          exists (t[.su a :: I])
           apply Red.beta
-        case _ lem =>
-          apply Or.inl; apply Value.app ih1 ih2
-          apply var_spine_not_lam lem
+        case app f b =>
+          apply Or.inl
+          apply Value.app ih1 ih2
+          simp
       case _ ih2 =>
         cases ih2; case _ a' ih2 =>
-        apply Or.inr
-        exists (f :@ a')
+        apply Or.inr; exists (f :@ a')
         apply Red.app2 ih2
     case _ ih1 =>
       cases ih1; case _ f' ih1 =>
-      apply Or.inr
-      exists (f' :@ a)
+      apply Or.inr; exists (f' :@ a)
       apply Red.app1 ih1
-  case lam Γ A B t j ih =>
+  case lam A t ih =>
     cases ih
     case _ ih =>
       apply Or.inl
       apply Value.lam ih
     case _ ih =>
       cases ih; case _ t' ih =>
-      apply Or.inr
-      exists (:λ[A] t')
+      apply Or.inr; exists (:λ[A] t')
       apply Red.lam ih

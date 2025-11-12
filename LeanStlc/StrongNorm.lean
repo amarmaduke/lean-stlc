@@ -1,6 +1,7 @@
 import LeanSubst
 import LeanStlc.Reduction
 import LeanStlc.Typing
+import LeanStlc.Progress
 
 open LeanSubst
 
@@ -13,7 +14,6 @@ abbrev SnIndices : SnVariant -> Type
 | .nor => Term
 | .red => (Term) × (Term)
 
--- TODO: prove the SN is equivalent to SN Red in LeanSubst
 inductive SNi : (v : SnVariant) -> SnIndices v -> Prop where
 | var {x} : SNi .neu (#x)
 | app {s t} :
@@ -183,6 +183,29 @@ namespace SNi
       case step s' j1 =>
         replace ih2 := ih2 s' x rfl
         apply SNi.red j1 ih2
+
+  @[simp]
+  abbrev SnSoundLemmaType : (v : SnVariant) -> (i : SnIndices v) -> Prop
+  | .neu, s => SN Red s
+  | .nor, s => SN Red s
+  | .red, (s, t) => SN Red s -> SN Red t
+
+  theorem sound {v i} : SNi v i -> SnBetaVarLemmaType v i := by
+    intro h; induction h <;> simp at *
+    case app s t j1 j2 ih1 ih2 =>
+      intro s x h1 h2; subst h1; subst h2
+      apply j1
+    case neu t j ih =>
+      intro s x h; subst h
+      have lem := beta_var j s x rfl
+      apply SNi.neu lem
+    case red t t' j1 j2 ih1 ih2 =>
+      intro s x h; subst h
+      have lem1 := SNi.red j1 j2
+      apply beta_var lem1 s x rfl
+
+  -- TODO: prove completeness, somehow harder than soundness
+  -- theorem complete {t} : SN Red t -> SNi .nor t := by sorry
 
 end SNi
 
