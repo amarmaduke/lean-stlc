@@ -184,27 +184,31 @@ namespace SNi
         replace ih2 := ih2 s' x rfl
         apply SNi.red j1 ih2
 
-  @[simp]
-  abbrev SnSoundLemmaType : (v : SnVariant) -> (i : SnIndices v) -> Prop
-  | .neu, s => SN Red s
-  | .nor, s => SN Red s
-  | .red, (s, t) => SN Red s -> SN Red t
+  -- TODO: prove soundness
+  -- @[simp]
+  -- abbrev SnSoundLemmaType : (v : SnVariant) -> (i : SnIndices v) -> Prop
+  -- | .neu, s => SN Red s
+  -- | .nor, s => SN Red s
+  -- | .red, (s, t) => SN Red s -> SN Red t
 
-  theorem sound {v i} : SNi v i -> SnBetaVarLemmaType v i := by
-    intro h; induction h <;> simp at *
-    case app s t j1 j2 ih1 ih2 =>
-      intro s x h1 h2; subst h1; subst h2
-      apply j1
-    case neu t j ih =>
-      intro s x h; subst h
-      have lem := beta_var j s x rfl
-      apply SNi.neu lem
-    case red t t' j1 j2 ih1 ih2 =>
-      intro s x h; subst h
-      have lem1 := SNi.red j1 j2
-      apply beta_var lem1 s x rfl
+  -- theorem sound {v i} : SNi v i -> SnSoundLemmaType v i := by
+  --   intro h; induction h <;> simp at *
+  --   case var x =>
+  --     apply SN.sn
+  --     intro y r
+  --     cases r
+  --   case app s t j1 j2 ih1 ih2 =>
+  --     apply SN.sn
+  --     intro y r
+  --     sorry
+  --   case lam t A j ih =>
+  --     sorry
+  --   case neu => sorry
+  --   case red => sorry
+  --   case beta => sorry
+  --   case step => sorry
 
-  -- TODO: prove completeness, somehow harder than soundness
+  -- TODO: prove completeness
   -- theorem complete {t} : SN Red t -> SNi .nor t := by sorry
 
 end SNi
