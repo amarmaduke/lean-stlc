@@ -84,6 +84,10 @@ theorem apply_compose {s : Term} {σ τ : Subst Term} : s[σ][τ] = s[σ ∘ τ]
 instance SubstMapCompose_Term : SubstMapCompose Term where
   apply_compose := apply_compose
 
+inductive Neutral : Term -> Prop where
+| var : Neutral #x
+| app : Neutral f -> Neutral (f :@ a)
+
 namespace Term
   @[simp]
   def from_action : Subst.Action Term -> Term

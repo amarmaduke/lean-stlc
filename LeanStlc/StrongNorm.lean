@@ -5,6 +5,165 @@ import LeanStlc.Progress
 
 open LeanSubst
 
+inductive SnHeadRed : Term -> Term -> Prop where
+| beta {t A b} : SN Red t -> SnHeadRed ((:λ[A] b) :@ t) (b[.su t :: I])
+| app {f f'} a : SnHeadRed f f' -> SnHeadRed (f :@ a) (f' :@ a)
+
+infix:80 " ~>sn " => SnHeadRed
+
+namespace SnHeadRed
+  theorem red_compatible {t a b} : t ~>sn a -> t ~> b -> a = b ∨ ∃ z, b ~>sn z ∧ a ~>* z := by
+    intro r1 r2
+    induction r1 generalizing b
+    case _ t' A b' h =>
+      cases r2
+      case _ => apply Or.inl rfl
+      case _ f' r =>
+        cases r; case _ b'' r =>
+        apply Or.inr; exists (b''[.su t' :: I])
+        apply And.intro
+        apply SnHeadRed.beta h
+        apply Star.subst; apply Star.step Star.refl r
+      case _ t'' r =>
+        apply Or.inr; exists (b'[.su t'' :: I])
+        apply And.intro
+        apply SnHeadRed.beta
+        apply SN.preservation_step h r
+        apply Red.subst_arg
+        intro x; cases x <;> simp
+        case _ => apply RedSubstAction.su r
+        case _ => apply RedSubstAction.re
+    case _ f f' a r1 ih =>
+      cases r2
+      case _ => cases r1
+      case _ f'' r2 =>
+        replace ih := ih r2
+        cases ih
+        case _ ih =>
+          subst ih; apply Or.inl rfl
+        case _ ih =>
+          cases ih; case _ z ih =>
+          have lem1 := SnHeadRed.app a ih.1
+          apply Or.inr
+          exists (z :@ a); apply And.intro lem1
+          apply Star.congr2_1 a Term.app Red.app1 ih.2
+      case _ a'' r2 =>
+        apply Or.inr
+        exists (f' :@ a''); apply And.intro
+        apply SnHeadRed.app a'' r1
+        apply Star.congr2_2 f' Term.app Red.app2
+        apply Star.step Star.refl r2
+end SnHeadRed
+
+namespace SN
+
+  theorem subterm_app {f a} : SN Red (f :@ a) -> SN Red f ∧ SN Red a := by
+    intro h
+    generalize zdef : f :@ a = z at *
+    induction h generalizing f a
+    case _ x h ih =>
+    apply And.intro
+    case _ =>
+      apply SN.sn; intro y r
+      subst zdef
+      replace ih := ih (y :@ a) (Red.app1 r) rfl
+      apply ih.1
+    case _ =>
+      apply SN.sn; intro y r
+      subst zdef
+      replace ih := ih (f :@ y) (Red.app2 r) rfl
+      apply ih.2
+
+  theorem lam {t A} : SN Red t <-> SN Red (:λ[A] t) := by
+    apply Iff.intro
+    case _ =>
+      intro h; induction h
+      case _ t h ih =>
+      apply SN.sn; intro y r
+      cases r; case _ t' r =>
+      apply ih _ r
+    case _ =>
+      intro h
+      generalize zdef : (:λ[A] t) = z at *
+      induction h generalizing t
+      case _ x h ih =>
+      apply SN.sn; intro y r
+      subst zdef
+      apply ih (:λ[A] y) (Red.lam r) rfl
+
+  theorem neutral_app {f a} : Neutral f -> SN Red f -> SN Red a -> SN Red (f :@ a) := by
+    intro h1 h2 h3
+    induction h2 generalizing a
+    case _ f h2 ih2 =>
+      induction h3
+      case _ a h3 ih3 =>
+      apply SN.sn; intro y r
+      cases r
+      case _ => cases h1
+      case _ f' r =>
+        have lem1 := Red.preservation_of_neutral_step h1 r
+        have lem2 : SN Red a := SN.sn h3
+        apply ih2 f' r lem1 lem2
+      case _ a' r =>
+        apply ih3 a' r
+
+  theorem weak_head_expansion {t b A} : SN Red t -> SN Red (b[.su t :: I]) -> SN Red ((:λ[A] b) :@ t) := by
+    intro h1; induction h1 generalizing b
+    case _ t h1 ih1 =>
+    intro h2
+    generalize zdef : b[.su t :: I] = z at *
+    induction h2 generalizing b
+    case _ w h2 ih2 =>
+    apply SN.sn; intro y r
+    cases r
+    case _ => rw [zdef]; apply SN.sn h2
+    case _ q r =>
+      cases r; case _ b' r =>
+      have lem : b[.su t :: I] ~> b'[.su t :: I] := by
+        apply Red.subst (.su t :: I) r
+      apply ih2 (b'[.su t :: I]) (by rw [<-zdef]; apply lem) rfl
+    case _ t' r =>
+      have lem1 : SN Red w := SN.sn h2; rw [<-zdef] at lem1
+      have lem2 : b[.su t :: I] ~>* b[.su t' :: I] := by
+        apply Red.subst_arg; intro x
+        cases x <;> simp at *
+        apply RedSubstAction.su r
+        apply RedSubstAction.re
+      have lem3 := SN.preservation lem1 lem2
+      apply ih1 t' r lem3
+
+  theorem red_app_preservation {f f' a} : f ~>sn f' -> SN Red f -> SN Red a -> SN Red (f' :@ a) -> SN Red (f :@ a) := by
+    intro r1 h1 h2 h3
+    induction h1 generalizing f' a
+    case _ f h1 ih1 =>
+    induction h2
+    case _ a h2 ih2 =>
+    apply SN.sn; intro y r2
+    cases r2
+    case _ => cases r1
+    case _ f'' r =>
+      have lem1 := SnHeadRed.red_compatible r1 r
+      cases lem1
+      case _ lem1 => subst lem1; apply h3
+      case _ lem1 =>
+        cases lem1; case _ z lem1 =>
+        apply ih1 f'' r lem1.1 (SN.sn h2)
+        apply SN.preservation h3
+        apply Star.congr2_1 a Term.app Red.app1 lem1.2
+    case _ a'' r =>
+      apply ih2 a'' r
+      apply SN.preservation h3
+      apply Star.congr2_2 f' Term.app Red.app2 (Star.step Star.refl r)
+
+  theorem backward_closure {t' t} : SN Red t' -> t ~>sn t' -> SN Red t := by
+    intro h r; induction r
+    case _ h2 => apply weak_head_expansion h2 h
+    case _ r ih =>
+      have lem := subterm_app h
+      apply red_app_preservation r (ih lem.1) lem.2 h
+
+end SN
+
 inductive SnVariant where
 | neu | nor | red
 
@@ -184,33 +343,72 @@ namespace SNi
         replace ih2 := ih2 s' x rfl
         apply SNi.red j1 ih2
 
-  -- TODO: prove soundness
-  -- @[simp]
-  -- abbrev SnSoundLemmaType : (v : SnVariant) -> (i : SnIndices v) -> Prop
-  -- | .neu, s => SN Red s
-  -- | .nor, s => SN Red s
-  -- | .red, (s, t) => SN Red s -> SN Red t
+  @[simp]
+  abbrev SnPropertyWeakenLemmaType : (v : SnVariant) -> (i : SnIndices v) -> Prop
+  | .neu, s => Neutral s
+  | .nor, _ => True
+  | .red, (s, t) => s ~> t
 
-  -- theorem sound {v i} : SNi v i -> SnSoundLemmaType v i := by
-  --   intro h; induction h <;> simp at *
-  --   case var x =>
-  --     apply SN.sn
-  --     intro y r
-  --     cases r
-  --   case app s t j1 j2 ih1 ih2 =>
-  --     apply SN.sn
-  --     intro y r
-  --     sorry
-  --   case lam t A j ih =>
-  --     sorry
-  --   case neu => sorry
-  --   case red => sorry
-  --   case beta => sorry
-  --   case step => sorry
+  theorem property_weaken {v i} : SNi v i -> SnPropertyWeakenLemmaType v i := by
+    intro h
+    induction h <;> simp at *
+    case _ => apply Neutral.var
+    case _ ih _ => apply Neutral.app ih
+    case _ => apply Red.beta
+    case _ ih => apply Red.app1 ih
+
+  @[simp]
+  abbrev SnSoundLemmaType : (v : SnVariant) -> (i : SnIndices v) -> Prop
+  | .neu, s => SN Red s
+  | .nor, s => SN Red s
+  | .red, (s, t) => s ~>sn t
+
+  theorem sound {v i} : SNi v i -> SnSoundLemmaType v i := by
+    intro h; induction h <;> simp at *
+    case _ => apply SN.sn; intro y r; cases r
+    case _ s t j1 j2 ih1 ih2 =>
+      have lem := property_weaken j1; simp at lem
+      apply SN.neutral_app lem ih1 ih2
+    case _ t A j ih => apply SN.lam.1 ih
+    case _ t j ih => apply ih
+    case _ ih1 ih2 => apply SN.backward_closure ih2 ih1
+    case _ ih => apply SnHeadRed.beta ih
+    case _ ih => apply SnHeadRed.app _ ih
 
   -- TODO: prove completeness
-  -- theorem complete {t} : SN Red t -> SNi .nor t := by sorry
-
+  -- theorem complete {t} : (SN Red t -> SNi .nor t) ∧ (∀ t', t ~>sn t' -> SNi .red (t, t')) := by
+  --   induction t
+  --   case _ x =>
+  --     apply And.intro
+  --     intro h; apply SNi.neu (SNi.var)
+  --     intro t' h; cases h
+  --   case _ f a ih1 ih2 =>
+  --     apply And.intro
+  --     case _ =>
+  --       intro h
+  --       have lem1 := sn_subterm_app h
+  --       have lem2 := ih1.1 lem1.1
+  --       cases lem2
+  --       case _ j =>
+  --         sorry
+  --       case _ h => apply SNi.neu (SNi.app h (ih2.1 lem1.2))
+  --       case _ t' j1 j2 =>
+  --         have lem : SNi .red (f :@ a, t' :@ a) := by sorry
+  --         apply SNi.red lem
+  --         sorry
+  --     case _ =>
+  --       intro t' r; cases r
+  --       case _ A b h =>
+  --         apply SNi.beta
+  --         apply ih2.1 h
+  --       case _ f' r =>
+  --         apply SNi.step
+  --         apply ih1.2 f' r
+  --   case _ A t ih =>
+  --     apply And.intro
+  --     intro h; apply SNi.lam
+  --     apply ih.1 (sn_lam.2 h)
+  --     intro t' r; cases r
 end SNi
 
 namespace StrongNormalizaton

@@ -14,6 +14,13 @@ inductive Red : Term -> Term -> Prop where
 infix:80 " ~> " => Red
 infix:81 " ~>* " => Star Red
 
+inductive RedSubstAction : Subst.Action Term -> Subst.Action Term -> Prop where
+| su {t t'} : t ~> t' -> RedSubstAction (.su t) (.su t')
+| re {x} : RedSubstAction (.re x) (.re x)
+
+infix:80 " ~s> " => RedSubstAction
+infix:81 " ~s>* " => Star RedSubstAction
+
 inductive ParRed : Term -> Term -> Prop where
 | var {x} : ParRed #x #x
 | beta {A b b' t t'} :
@@ -180,6 +187,32 @@ namespace Red
       simp; apply Red.lam
       apply ih
 
+  theorem subst_action {x} {σ σ' : Subst Term} (r : Ren) :
+    σ x ~s> σ' x ->
+    (σ ∘ r.to) x ~s> (σ' ∘ r.to) x
+  := by
+    intro h
+    unfold Subst.compose; simp
+    generalize zdef : σ x = z at *
+    generalize zpdef : σ' x = z' at *
+    cases z <;> cases z'
+    all_goals (cases h; try simp [*])
+    apply RedSubstAction.re
+    case _ r =>
+      apply RedSubstAction.su
+      apply subst _ r
+
+  theorem subst_red_lift {σ σ' : Subst Term} :
+    (∀ x, σ x ~s> σ' x) ->
+    ∀ x, σ.lift x ~s> σ'.lift x
+  := by
+    intro h x
+    cases x <;> simp
+    case _ => apply RedSubstAction.re
+    case _ x =>
+      have lem := subst_action (· + 1) (h x); simp at lem
+      apply lem
+
   theorem seq_implies_par {t t'} : t ~> t' -> t ~p> t' := by
     intro h; induction h
     case beta => apply ParRed.beta ParRed.refl ParRed.refl
@@ -216,6 +249,93 @@ namespace Red
       replace r2 := par_implies_seqs r2
       apply Star.trans ih r2
 
+  theorem pars_action_lift : t ~p>* t' -> .su t ~ps>* .su t' := by
+    intro r; induction r
+    case _ => apply Star.refl
+    case _ r1 r2 ih =>
+      apply Star.step ih
+      apply ParRedSubstAction.su r2
+
+  theorem seqs_action_lift : t ~>* t' -> .su t ~s>* .su t' := by
+    intro r; induction r
+    case _ => apply Star.refl
+    case _ r1 r2 ih =>
+      apply Star.step ih
+      apply RedSubstAction.su r2
+
+  theorem seqs_action_destruct : a ~s>* .su t' -> ∃ t, a = .su t ∧ t ~>* t' := by
+    intro r
+    generalize zdef : Subst.Action.su t' = z at *
+    induction r generalizing t'
+    case _ =>
+      subst zdef; exists t'; simp
+      apply Star.refl
+    case _ r1 r2 ih =>
+      subst zdef; cases r2
+      case _ t r2 =>
+        replace ih := @ih t rfl
+        cases ih; case _ z ih =>
+        cases ih; case _ e ih =>
+        subst e; exists z; apply And.intro rfl
+        apply Star.step ih r2
+
+  theorem pars_action_iff_seqs_action : t ~ps>* t' <-> t ~s>* t' := by
+    apply Iff.intro
+    case _ =>
+      intro h; induction h
+      case _ => apply Star.refl
+      case _ r1 r2 ih =>
+        cases r2
+        case _ r2 =>
+          have lem := seqs_action_destruct ih
+          cases lem; case _ z lem =>
+          cases lem; case _ e lem =>
+          subst e
+          replace r2 := par_implies_seqs r2
+          apply Star.trans ih
+          apply seqs_action_lift r2
+        case _ => apply ih
+    case _ =>
+      intro h; induction h
+      case _ => apply Star.refl
+      case _ r1 r2 ih =>
+        cases r2
+        case _ r2 =>
+          replace r1 := seqs_action_destruct r1
+          cases r1; case _ z r1 =>
+          cases r1; case _ e r1 =>
+          subst e; replace r2 := Star.step r1 r2
+          replace r2 := seqs_implies_pars r2
+          apply pars_action_lift r2
+        case _ => apply ih
+
+  theorem subst_arg {t} {σ σ' : Subst Term} :
+    (∀ x, σ x ~s> σ' x) ->
+    t[σ] ~>* t[σ']
+  := by
+    intro h
+    induction t generalizing σ σ' <;> simp at *
+    case _ x =>
+      generalize zdef : σ x = z at *
+      generalize wdef : σ' x = w at *
+      cases z
+      case _ t =>
+        replace h := h x; rw [zdef] at h
+        rw [wdef] at h; cases h; simp
+        apply Star.refl
+      case _ t =>
+        replace h := h x; rw [zdef] at h
+        rw [wdef] at h; cases h; simp
+        case _ t' r =>
+        apply Star.step Star.refl r
+    case _ ih1 ih2 =>
+      apply Star.congr2 Term.app Red.app1 Red.app2 (ih1 h) (ih2 h)
+    case _ A a ih =>
+      have lem := subst_red_lift h
+      replace ih := ih lem
+      have lem2 := Star.congr1 (t1 := a[σ.lift]) (t1' := a[σ'.lift]) (:λ[A] ·) (@Red.lam A) ih
+      simp at lem2; apply lem2
+
   theorem confluence {s t1 t2} : s ~>* t1 -> s ~>* t2 -> ∃ t, t1 ~>* t ∧ t2 ~>* t := by
     intro h1 h2
     have lem1 := seqs_implies_pars h1
@@ -231,4 +351,21 @@ namespace Red
 
   instance : HasConfluence Red where
     confluence := confluence
+
+  theorem preservation_of_neutral_step : Neutral t -> t ~> t' -> Neutral t' := by
+    intro h r
+    induction h generalizing t'
+    case _ => cases r
+    case _ f a h ih =>
+      cases r
+      case _ => cases h
+      case _ f' r => apply Neutral.app (ih r)
+      case _ a' r => apply Neutral.app h
+
+  theorem preservation_of_neutral : Neutral t -> t ~>* t' -> Neutral t' := by
+    intro h r
+    induction r
+    case _ => apply h
+    case _ r1 r2 ih =>
+      apply preservation_of_neutral_step ih r2
 end Red
