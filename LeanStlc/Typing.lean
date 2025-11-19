@@ -99,9 +99,9 @@ case lam j ih =>
   replace ih := ih _ _ (typing_subst_lift _ h)
   simp at ih; apply ih
 
-theorem typing_beta {Γ A B b t} : (A::Γ) ⊢ b : B -> Γ ⊢ t : A -> Γ ⊢ b[.su t::I] : B := by
+theorem typing_beta {Γ A B b t} : (A::Γ) ⊢ b : B -> Γ ⊢ t : A -> Γ ⊢ b[%t::I] : B := by
 intro j1 j2
-apply typing_subst Γ (.su t::I) j1 (λ x T h => by {
+apply typing_subst Γ (%t::I) j1 (λ x T h => by {
   simp; cases x <;> simp
   case _ =>
     cases h; case _ h =>

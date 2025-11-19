@@ -35,7 +35,7 @@ def is_arrow : Ty -> Option (Ty × Ty)
 
 @[simp]
 def infer (Γ : List Ty) : Term -> Option Ty
-| #x => Γ[x]?
+| .var x => Γ[x]?
 | f :@ a => do
   let T <- infer Γ f
   let A' <- infer Γ a

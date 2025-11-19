@@ -6,7 +6,7 @@ import LeanStlc.Progress
 open LeanSubst
 
 inductive SnHeadRed : Term -> Term -> Prop where
-| beta {t A b} : SN Red t -> SnHeadRed ((:λ[A] b) :@ t) (b[.su t :: I])
+| beta {t A b} : SN Red t -> SnHeadRed ((:λ[A] b) :@ t) (b[%t :: I])
 | app {f f'} a : SnHeadRed f f' -> SnHeadRed (f :@ a) (f' :@ a)
 
 infix:80 " ~>sn " => SnHeadRed
@@ -20,12 +20,12 @@ namespace SnHeadRed
       case _ => apply Or.inl rfl
       case _ f' r =>
         cases r; case _ b'' r =>
-        apply Or.inr; exists (b''[.su t' :: I])
+        apply Or.inr; exists (b''[%t' :: I])
         apply And.intro
         apply SnHeadRed.beta h
         apply Star.subst; apply Star.step Star.refl r
       case _ t'' r =>
-        apply Or.inr; exists (b'[.su t'' :: I])
+        apply Or.inr; exists (b'[%t'' :: I])
         apply And.intro
         apply SnHeadRed.beta
         apply SN.preservation_step h r
@@ -107,11 +107,11 @@ namespace SN
       case _ a' r =>
         apply ih3 a' r
 
-  theorem weak_head_expansion {t b A} : SN Red t -> SN Red (b[.su t :: I]) -> SN Red ((:λ[A] b) :@ t) := by
+  theorem weak_head_expansion {t b A} : SN Red t -> SN Red (b[%t::I]) -> SN Red ((:λ[A] b) :@ t) := by
     intro h1; induction h1 generalizing b
     case _ t h1 ih1 =>
     intro h2
-    generalize zdef : b[.su t :: I] = z at *
+    generalize zdef : b[%t :: I] = z at *
     induction h2 generalizing b
     case _ w h2 ih2 =>
     apply SN.sn; intro y r
@@ -119,12 +119,12 @@ namespace SN
     case _ => rw [zdef]; apply SN.sn h2
     case _ q r =>
       cases r; case _ b' r =>
-      have lem : b[.su t :: I] ~> b'[.su t :: I] := by
-        apply Red.subst (.su t :: I) r
-      apply ih2 (b'[.su t :: I]) (by rw [<-zdef]; apply lem) rfl
+      have lem : b[%t::I] ~> b'[%t::I] := by
+        apply Red.subst (%t::I) r
+      apply ih2 (b'[%t::I]) (by rw [<-zdef]; apply lem) rfl
     case _ t' r =>
       have lem1 : SN Red w := SN.sn h2; rw [<-zdef] at lem1
-      have lem2 : b[.su t :: I] ~>* b[.su t' :: I] := by
+      have lem2 : b[%t::I] ~>* b[%t'::I] := by
         apply Red.subst_arg; intro x
         cases x <;> simp at *
         apply RedSubstAction.su r
@@ -191,7 +191,7 @@ inductive SNi : (v : SnVariant) -> SnIndices v -> Prop where
   SNi .nor t
 | beta {t A b} :
   SNi .nor t ->
-  SNi .red ((:λ[A] b) :@ t, b[.su t :: I])
+  SNi .red ((:λ[A] b) :@ t, b[%t::I])
 | step {s s' t} :
   SNi .red (s, s') ->
   SNi .red (s :@ t, s' :@ t)
@@ -224,7 +224,7 @@ namespace SNi
     case red t t' j1 j2 ih1 ih2 =>
       apply SNi.red (ih1 _ h) (ih2 _ h)
     case beta t A b j ih =>
-      have lem := @SNi.beta (t[σ]) A (b[.re 0 :: σ ∘ S]) (ih σ h); simp at lem
+      have lem := @SNi.beta (t[σ]) A (b[#0::σ ∘ S]) (ih σ h); simp at lem
       apply lem
     case step s s' t j ih =>
       apply SNi.step; simp [*]
@@ -293,7 +293,7 @@ namespace SNi
           subst h1
           replace ih := ih σ h _ h2
           subst h2; subst h3; simp at *
-          exists (u[.su v :: I]); simp
+          exists (u[%v::I]); simp
           apply SNi.beta ih
     case step s s' t j ih =>
       intro z h2
@@ -336,7 +336,7 @@ namespace SNi
       cases j1
       case beta A b j1 =>
         apply SNi.lam
-        apply @antirename .nor (b[.su #x :: I]) (.su #x :: I) _ j2
+        apply @antirename .nor (b[%#x :: I]) (%#x :: I) _ j2
         rfl; unfold IsRen; intro i
         cases i <;> simp
       case step s' j1 =>
@@ -486,12 +486,12 @@ namespace StrongNormalizaton
       apply ih2 σ h
     case lam Γ A B t j ih =>
       simp; intro σ h r v sr lv
-      have lem : t[.re 0::σ ∘ r ∘ S][.su v :: I] = t[.su v::σ ∘ r] := by simp
-      apply cr.2.2 _ (t[.su v::σ ∘ r])
-      have lem2 := @SNi.beta v A (t[.re 0::σ ∘ r ∘ S]); simp at lem2
+      have lem : t[#0::σ ∘ r ∘ S][%v::I] = t[%v::σ ∘ r] := by simp
+      apply cr.2.2 _ (t[%v::σ ∘ r])
+      have lem2 := @SNi.beta v A (t[#0::σ ∘ r ∘ S]); simp at lem2
       apply lem2
       apply cr.1 _ lv
-      replace ih := ih (.su v :: σ ∘ r)
+      replace ih := ih (%v::σ ∘ r)
       apply ih
       simp; intro x T j2
       cases x
@@ -511,10 +511,14 @@ namespace StrongNormalizaton
         case _ t => apply monotone r sr h
 end StrongNormalizaton
 
-theorem strong_normalization {Γ t A} : Γ ⊢ t : A -> SNi .nor t := by
+theorem strong_normalization_inductive {Γ t A} : Γ ⊢ t : A -> SNi .nor t := by
   intro j
   have lem1 : StrongNormalizaton.GR Γ I := by
     simp; intro x T h
     apply StrongNormalizaton.var
   have lem2 := StrongNormalizaton.fundamental j I lem1; simp at lem2
   apply StrongNormalizaton.cr.1 _ lem2
+
+theorem strong_normalization {Γ t A} : Γ ⊢ t : A -> SN Red t := by
+  intro j; apply @SNi.sound .nor t
+  apply strong_normalization_inductive j

@@ -12,7 +12,7 @@ def WeakValue : Term -> Bool
 namespace WeakNormalization
   @[simp]
   def VR : Ty -> Term -> Prop
-  | A -t> B, :λ[_] b => ∀ a, VR A a -> ∃ v, (b[.su a::I]) ~>* v ∧ VR B v
+  | A -t> B, :λ[_] b => ∀ a, VR A a -> ∃ v, (b[%a::I]) ~>* v ∧ VR B v
   | _, _ => False
 
   @[simp]

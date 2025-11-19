@@ -31,15 +31,26 @@ protected def Term.repr (a : Term) (p : Nat) : Std.Format :=
 instance : Repr Term where
   reprPrec := Term.repr
 
-prefix:max "#" => Term.var
+open LeanSubst
+
+instance instPrefixHash_Term : PrefixHash Term where
+  hash := Term.var
+
+namespace Term
+  @[simp]
+  theorem var_def : Term.var x = #x := by simp [PrefixHash.hash]
+
+  @[simp]
+  theorem var_eq : (PrefixHash.hash (T := Term) x = #y) = (x = y) := by
+    simp [-var_def, PrefixHash.hash]
+end Term
+
 infixl:65 " :@ " => Term.app
 notation ":λ[" A "] " t => Term.lam A t
 
-open LeanSubst
-
 @[simp]
 def smap (lf : Subst.Lift Term) (f : Nat -> Subst.Action Term) : Term -> Term
-| #x =>
+| .var x =>
   match f x with
   | .re y => #y
   | .su t => t
@@ -55,7 +66,7 @@ instance HasSimpleVar_Term : HasSimpleVar Term where
   smap := by solve_simple_var_smap
 
 @[simp]
-theorem subst_var : (#x)[σ] = match σ x with | .re y => #y | .su t => t := by
+theorem subst_var {σ : Subst Term} : (#x)[σ] = match σ x with | .re y => #y | .su t => t := by
   unfold Subst.apply; simp [SubstMap.smap]
 
 @[simp]
