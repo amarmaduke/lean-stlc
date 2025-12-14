@@ -12,7 +12,7 @@ def WeakValue : Term -> Bool
 namespace WeakNormalization
   @[simp]
   def VR : Ty -> Term -> Prop
-  | A -t> B, :λ[_] b => ∀ a, VR A a -> ∃ v, (b[%a::I]) ~>* v ∧ VR B v
+  | A -t> B, :λ[_] b => ∀ a, VR A a -> ∃ v, (b[.su a::+0]) ~>* v ∧ VR B v
   | _, _ => False
 
   @[simp]
@@ -70,8 +70,8 @@ namespace WeakNormalization
     case lam Γ A B t j ih =>
       simp; intro σ h
       simp at ih
-      exists (:λ[A] t[.re 0 :: σ ∘ S])
-      apply And.intro Star.refl; simp
+      exists (:λ[A] t[σ.lift]); simp
+      apply And.intro Star.refl
       intro a vr
       have lem := ih (.su a :: σ) (by {
         intro x T h2
@@ -86,7 +86,7 @@ theorem weak_termination {t A} : [] ⊢ t : A -> ∃ v, t ~>* v ∧ WeakValue v 
   intro j
   have lem := WeakNormalization.fundamental j
   simp at lem
-  replace lem := lem I; simp at lem
+  replace lem := lem +0; simp at lem
   cases lem; case _ v lem =>
   have weak := WeakNormalization.VR.sound lem.2
   exists v
@@ -95,8 +95,7 @@ theorem weak_termination {t A} : [] ⊢ t : A -> ∃ v, t ~>* v ∧ WeakValue v 
 theorem consistency_lemma {t} : [] ⊢ t : ⊤ -> WeakValue t -> False := by
   intro h1 h2
   cases t <;> simp [WeakValue] at *
-  case lam A b =>
-    cases h1
+  case lam A b => cases h1
 
 theorem consistency {t} : ¬ ([] ⊢ t : ⊤) := by
   intro h

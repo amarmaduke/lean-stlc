@@ -6,7 +6,7 @@ defaultTargets = ["lean-stlc"]
 name = "lean-subst"
 scope = "amarmaduke"
 git = "https://github.com/amarmaduke/lean-subst"
-rev = "main"
+rev = "experimental"
 
 [[lean_lib]]
 name = "LeanStlc"

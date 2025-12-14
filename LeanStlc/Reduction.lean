@@ -6,7 +6,7 @@ import LeanStlc.Term
 open LeanSubst
 
 inductive Red : Term -> Term -> Prop where
-| beta {A b t} : Red ((:λ[A] b) :@ t) (b[%t::I])
+| beta {A b t} : Red ((:λ[A] b) :@ t) (b[.su t::+0])
 | app1 {f f' a} : Red f f' -> Red (f :@ a) (f' :@ a)
 | app2 {a a' f} : Red a a' -> Red (f :@ a) (f :@ a')
 | lam {A t t'} : Red t t' -> Red (:λ[A] t) (:λ[A] t')
@@ -15,18 +15,18 @@ infix:80 " ~> " => Red
 infix:81 " ~>* " => Star Red
 
 inductive RedSubstAction : Subst.Action Term -> Subst.Action Term -> Prop where
-| su {t t'} : t ~> t' -> RedSubstAction (%t) (%t')
-| re {x} : RedSubstAction (#x) (#x)
+| su {t t'} : t ~> t' -> RedSubstAction (.su t) (.su t')
+| re {x} : RedSubstAction (.re x) (.re x)
 
 infix:80 " ~s> " => RedSubstAction
 infix:81 " ~s>* " => Star RedSubstAction
 
 inductive ParRed : Term -> Term -> Prop where
-| var {x} : ParRed #x #x
+| var {x} : ParRed (.var x) (.var x)
 | beta {A b b' t t'} :
   ParRed b b' ->
   ParRed t t' ->
-  ParRed ((:λ[A] b) :@ t) (b'[%t'::I])
+  ParRed ((:λ[A] b) :@ t) (b'[.su t'::+0])
 | app {f f' a a'} :
   ParRed f f' ->
   ParRed a a' ->
@@ -39,8 +39,8 @@ infix:80 " ~p> " => ParRed
 infix:81 " ~p>* " => Star ParRed
 
 inductive ParRedSubstAction : Subst.Action Term -> Subst.Action Term -> Prop where
-| su {t t'} : t ~p> t' -> ParRedSubstAction (%t) (%t')
-| re {x} : ParRedSubstAction (#x) (#x)
+| su {t t'} : t ~p> t' -> ParRedSubstAction (.su t) (.su t')
+| re {x} : ParRedSubstAction (.re x) (.re x)
 
 infix:80 " ~ps> " => ParRedSubstAction
 infix:81 " ~ps>* " => Star ParRedSubstAction
@@ -57,7 +57,7 @@ namespace ParRed
   | .app (.lam _ b) t =>
     let b' := complete b
     let t' := complete t
-    b'[%t'::I]
+    b'[.su t'::+0]
   | .app f a =>
     let f' := complete f
     let a' := complete a
@@ -73,9 +73,7 @@ namespace ParRed
     induction h generalizing σ
     case var => apply ParRed.refl
     case beta A b b' t t' r1 r2 ih1 ih2 =>
-      simp; have lem1 := @ParRed.beta A
-        (b[.re 0 :: σ ∘ S]) (b'[.re 0 :: σ ∘ S])
-        (t[σ]) (t'[σ])
+      simp; have lem1 := @ParRed.beta A (b[σ.lift]) (b'[σ.lift]) (t[σ]) (t'[σ])
       simp at lem1; apply lem1
       apply ih1; apply ih2
     case app r1 r2 ih1 ih2 =>
@@ -127,7 +125,7 @@ namespace ParRed
     case app f a ih1 ih2 =>
       cases h2 <;> simp at *
       case beta A b b' t r1 r2 =>
-        have lem1 := @ParRed.beta A (b[#0::σ ∘ S]) (b'[#0::σ' ∘ S]) (a[σ]) (t[σ'])
+        have lem1 := @ParRed.beta A (b[σ.lift]) (b'[σ'.lift]) (a[σ]) (t[σ'])
         simp at lem1; apply lem1 _
         apply ih2 h1 r2
         have lem2 := ih1 h1 (ParRed.lam r1); simp at lem2
@@ -177,7 +175,7 @@ namespace Red
     intro h
     induction h generalizing σ
     case beta A b t =>
-      simp; have lem1 := @Red.beta A (b[#0::σ ∘ S]) (t[σ])
+      simp; have lem1 := @Red.beta A (b[σ.lift]) (t[σ])
       simp at lem1; apply lem1
     case app1 ih =>
       simp; apply Red.app1 (ih σ)
@@ -249,23 +247,23 @@ namespace Red
       replace r2 := par_implies_seqs r2
       apply Star.trans ih r2
 
-  theorem pars_action_lift : t ~p>* t' -> %t ~ps>* %t' := by
+  theorem pars_action_lift : t ~p>* t' -> .su t ~ps>* .su t' := by
     intro r; induction r
     case _ => apply Star.refl
     case _ r1 r2 ih =>
       apply Star.step ih
       apply ParRedSubstAction.su r2
 
-  theorem seqs_action_lift : t ~>* t' -> %t ~s>* %t' := by
+  theorem seqs_action_lift : t ~>* t' -> .su t ~s>* .su t' := by
     intro r; induction r
     case _ => apply Star.refl
     case _ r1 r2 ih =>
       apply Star.step ih
       apply RedSubstAction.su r2
 
-  theorem seqs_action_destruct : a ~s>* %t' -> ∃ t, a = %t ∧ t ~>* t' := by
+  theorem seqs_action_destruct : a ~s>* .su t' -> ∃ t, a = .su t ∧ t ~>* t' := by
     intro r
-    generalize zdef : PrefixPercent.percent (F := Subst.Action) t' = z at r
+    generalize zdef : Subst.Action.su t' = z at r
     induction r generalizing t'
     case _ =>
       subst zdef; exists t'; simp

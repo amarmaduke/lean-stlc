@@ -6,7 +6,7 @@ import LeanStlc.Progress
 open LeanSubst
 
 inductive SnHeadRed : Term -> Term -> Prop where
-| beta {t A b} : SN Red t -> SnHeadRed ((:λ[A] b) :@ t) (b[%t :: I])
+| beta {t A b} : SN Red t -> SnHeadRed ((:λ[A] b) :@ t) (b[.su t :: +0])
 | app {f f'} a : SnHeadRed f f' -> SnHeadRed (f :@ a) (f' :@ a)
 
 infix:80 " ~>sn " => SnHeadRed
@@ -20,12 +20,12 @@ namespace SnHeadRed
       case _ => apply Or.inl rfl
       case _ f' r =>
         cases r; case _ b'' r =>
-        apply Or.inr; exists (b''[%t' :: I])
+        apply Or.inr; exists (b''[.su t' :: +0])
         apply And.intro
         apply SnHeadRed.beta h
         apply Star.subst; apply Star.step Star.refl r
       case _ t'' r =>
-        apply Or.inr; exists (b'[%t'' :: I])
+        apply Or.inr; exists (b'[.su t'' :: +0])
         apply And.intro
         apply SnHeadRed.beta
         apply SN.preservation_step h r
@@ -107,30 +107,31 @@ namespace SN
       case _ a' r =>
         apply ih3 a' r
 
-  theorem weak_head_expansion {t b A} : SN Red t -> SN Red (b[%t::I]) -> SN Red ((:λ[A] b) :@ t) := by
-    intro h1; induction h1 generalizing b
-    case _ t h1 ih1 =>
-    intro h2
-    generalize zdef : b[%t :: I] = z at *
-    induction h2 generalizing b
-    case _ w h2 ih2 =>
-    apply SN.sn; intro y r
-    cases r
-    case _ => rw [zdef]; apply SN.sn h2
-    case _ q r =>
-      cases r; case _ b' r =>
-      have lem : b[%t::I] ~> b'[%t::I] := by
-        apply Red.subst (%t::I) r
-      apply ih2 (b'[%t::I]) (by rw [<-zdef]; apply lem) rfl
-    case _ t' r =>
-      have lem1 : SN Red w := SN.sn h2; rw [<-zdef] at lem1
-      have lem2 : b[%t::I] ~>* b[%t'::I] := by
-        apply Red.subst_arg; intro x
-        cases x <;> simp at *
-        apply RedSubstAction.su r
-        apply RedSubstAction.re
-      have lem3 := SN.preservation lem1 lem2
-      apply ih1 t' r lem3
+  theorem weak_head_expansion {t b A} : SN Red t -> SN Red (b[.su t::I]) -> SN Red ((:λ[A] b) :@ t) := by
+    sorry
+    -- intro h1; induction h1 generalizing b
+    -- case _ t h1 ih1 =>
+    -- intro h2
+    -- generalize zdef : b[.su t :: I] = z at *
+    -- induction h2 generalizing b
+    -- case _ w h2 ih2 =>
+    -- apply SN.sn; intro y r
+    -- cases r
+    -- case _ => rw [zdef]; apply SN.sn h2
+    -- case _ q r =>
+    --   cases r; case _ b' r =>
+    --   have lem : b[.su t::I] ~> b'[.su t::I] := by
+    --     apply Red.subst (%t::I) r
+    --   apply ih2 (b'[.su t::I]) (by rw [<-zdef]; apply lem) rfl
+    -- case _ t' r =>
+    --   have lem1 : SN Red w := SN.sn h2; rw [<-zdef] at lem1
+    --   have lem2 : b[.su t::I] ~>* b[.su t'::I] := by
+    --     apply Red.subst_arg; intro x
+    --     cases x <;> simp at *
+    --     apply RedSubstAction.su r
+    --     apply RedSubstAction.re
+    --   have lem3 := SN.preservation lem1 lem2
+    --   apply ih1 t' r lem3
 
   theorem red_app_preservation {f f' a} : f ~>sn f' -> SN Red f -> SN Red a -> SN Red (f' :@ a) -> SN Red (f :@ a) := by
     intro r1 h1 h2 h3
@@ -174,7 +175,7 @@ abbrev SnIndices : SnVariant -> Type
 | .red => (Term) × (Term)
 
 inductive SNi : (v : SnVariant) -> SnIndices v -> Prop where
-| var {x} : SNi .neu (#x)
+| var {x} : SNi .neu (.var x)
 | app {s t} :
   SNi .neu s ->
   SNi .nor t ->
@@ -191,128 +192,173 @@ inductive SNi : (v : SnVariant) -> SnIndices v -> Prop where
   SNi .nor t
 | beta {t A b} :
   SNi .nor t ->
-  SNi .red ((:λ[A] b) :@ t, b[%t::I])
+  SNi .red ((:λ[A] b) :@ t, b[.su t :: +0])
 | step {s s' t} :
   SNi .red (s, s') ->
   SNi .red (s :@ t, s' :@ t)
 
 namespace SNi
   @[simp]
-  abbrev SnRenameLemmaType (σ : Subst Term) (_ : IsRen σ) :
+  abbrev SnRenameLemmaType (r : Ren) :
     (v : SnVariant) -> (i : SnIndices v) -> Prop
-  | .neu, t => SNi .neu (t[σ])
-  | .nor, t => SNi .nor (t[σ])
-  | .red, (t, t') => SNi .red (t[σ], t'[σ])
+  | .neu, t => SNi .neu (t[r])
+  | .nor, t => SNi .nor (t[r])
+  | .red, (t, t') => SNi .red (t[r], t'[r])
 
-  theorem rename {v i} σ h : SNi v i -> SnRenameLemmaType σ h v i := by
-    intro j; induction j generalizing σ <;> simp at *
-    case var x =>
-      unfold IsRen at h
-      replace h := h x
-      cases h; case _ k h =>
-      cases h
-      case _ h => rw [h]; simp; apply SNi.var
-      case _ h => rw [h]; simp; apply SNi.var
-    case app i1 i2 j1 j2 ih1 ih2 =>
-      apply SNi.app <;> simp [*]
-    case lam t A j ih =>
-      apply SNi.lam
-      replace ih := ih σ.lift (IsRen.lift h)
-      simp at ih; apply ih
-    case neu t j ih =>
-      apply SNi.neu; simp [*]
-    case red t t' j1 j2 ih1 ih2 =>
-      apply SNi.red (ih1 _ h) (ih2 _ h)
-    case beta t A b j ih =>
-      have lem := @SNi.beta (t[σ]) A (b[#0::σ ∘ S]) (ih σ h); simp at lem
-      apply lem
-    case step s s' t j ih =>
-      apply SNi.step; simp [*]
+  theorem rename {v i} r : SNi v i -> SnRenameLemmaType r v i := by
+    sorry
+    -- intro j; induction j generalizing r <;> simp at *
+    -- case var x =>
+    --   unfold IsRen at h
+    --   replace h := h x
+    --   cases h; case _ k h =>
+    --   cases h
+    --   case _ h => rw [h]; simp; apply SNi.var
+    --   case _ h => rw [h]; simp; apply SNi.var
+    -- case app i1 i2 j1 j2 ih1 ih2 =>
+    --   apply SNi.app <;> simp [*]
+    -- case lam t A j ih =>
+    --   apply SNi.lam
+    --   replace ih := ih σ.lift (IsRen.lift h)
+    --   simp at ih; apply ih
+    -- case neu t j ih =>
+    --   apply SNi.neu; simp [*]
+    -- case red t t' j1 j2 ih1 ih2 =>
+    --   apply SNi.red (ih1 _ h) (ih2 _ h)
+    -- case beta t A b j ih =>
+    --   have lem := @SNi.beta (t[σ]) A (b[.re 0 :: σ ∘ S]) (ih σ h); simp at lem
+    --   apply lem
+    -- case step s s' t j ih =>
+    --   apply SNi.step; simp [*]
 
   @[simp]
-  abbrev SnAntiRenameLemmaType (σ : Subst Term) (_ : IsRen σ) :
+  abbrev SnAntiRenameLemmaType (r : Ren) :
     (v : SnVariant) -> (i : SnIndices v) -> Prop
-  | .neu, t => ∀ z, t = z[σ] -> SNi .neu z
-  | .nor, t => ∀ z, t = z[σ] -> SNi .nor z
+  | .neu, t => ∀ z, t = z[r] -> SNi .neu z
+  | .nor, t => ∀ z, t = z[r] -> SNi .nor z
   | .red, (t, t') =>
-    ∀ z, t = z[σ] ->
-    ∃ z', t' = z'[σ] ∧ SNi .red (z, z')
+    ∀ z, t = z[r] ->
+    ∃ z', t' = z'[r] ∧ SNi .red (z, z')
 
-  theorem antirename {v i} σ h : SNi v i -> SnAntiRenameLemmaType σ h v i := by
-    intro j; induction j generalizing σ <;> simp at *
-    case var x =>
-      intro z h
-      cases z <;> simp at h
-      case _ y => apply SNi.var
-    case app s t j1 j2 ih1 ih2 =>
-      intro z h1; cases z <;> simp at h1
-      case _ x =>
-        have lem := IsRen.var_apply_forced x h; simp at lem
-        cases lem; case _ k lem =>
-        rw [lem] at h1; injection h1
-      case _ u v =>
-        apply SNi.app (ih1 σ h _ h1.1) (ih2 σ h _ h1.2)
-    case lam t A j ih =>
-      intro z h
-      cases z <;> simp at h
-      case _ σr x =>
-        have lem := IsRen.var_apply_forced x σr; simp at lem
-        cases lem; case _ k lem =>
-        rw [lem] at h; injection h
-      case _ A' b =>
-        cases h; case _ h1 h2 =>
-        subst h1; apply SNi.lam
-        replace ih := ih (σ.lift) (IsRen.lift h) b
-        simp at ih; apply ih h2
-    case neu t j ih =>
-      intro z h2
-      replace ih := ih σ h z h2
-      apply SNi.neu ih
-    case red t t' j1 j2 ih1 ih2 =>
-      intro z h2
-      have lem := ih1 σ h _ h2
-      cases lem; case _ z' h2 =>
-      apply SNi.red h2.2
-      apply ih2 σ h _ h2.1
-    case beta t A b j ih =>
-      intro z h2
-      cases z <;> simp at h2
-      case _ x =>
-        have lem := IsRen.var_apply_forced x h; simp at lem
-        cases lem; case _ k lem =>
-        rw [lem] at h2; injection h2
-      case _ u v =>
-        cases u <;> simp at h2
-        case _ x =>
-          have lem := IsRen.var_apply_forced x h; simp at lem
-          cases lem; case _ k lem =>
-          rw [lem] at h2; injection h2.1
-        case _ A' u =>
-          cases h2; case _ h1 h2 =>
-          cases h1; case _ h1 h3 =>
-          subst h1
-          replace ih := ih σ h _ h2
-          subst h2; subst h3; simp at *
-          exists (u[%v::I]); simp
-          apply SNi.beta ih
-    case step s s' t j ih =>
-      intro z h2
-      cases z <;> simp at h2
-      case _ x =>
-        have lem := IsRen.var_apply_forced x h; simp at lem
-        cases lem; case _ k lem =>
-        rw [lem] at h2; injection h2
-      case _ u v =>
-        replace ih := ih σ h _ h2.1
-        cases ih; case _ z' h' =>
-        exists (z' :@ v); simp [*]
-        apply SNi.step (h'.2)
+  theorem antirename {v i} r : SNi v i -> SnAntiRenameLemmaType r v i := by
+    sorry
+    -- intro j; induction j generalizing σ <;> simp at *
+    -- case var x =>
+    --   intro z h
+    --   cases z <;> simp at h
+    --   case _ y => apply SNi.var
+    -- case app s t j1 j2 ih1 ih2 =>
+    --   intro z h1; cases z <;> simp at h1
+    --   case _ x =>
+    --     have lem := IsRen.var_apply_forced x h; simp at lem
+    --     cases lem; case _ k lem =>
+    --     rw [lem] at h1; injection h1
+    --   case _ u v =>
+    --     apply SNi.app (ih1 σ h _ h1.1) (ih2 σ h _ h1.2)
+    -- case lam t A j ih =>
+    --   intro z h
+    --   cases z <;> simp at h
+    --   case _ σr x =>
+    --     have lem := IsRen.var_apply_forced x σr; simp at lem
+    --     cases lem; case _ k lem =>
+    --     rw [lem] at h; injection h
+    --   case _ A' b =>
+    --     cases h; case _ h1 h2 =>
+    --     subst h1; apply SNi.lam
+    --     replace ih := ih (σ.lift) (IsRen.lift h) b
+    --     simp at ih; apply ih h2
+    -- case neu t j ih =>
+    --   intro z h2
+    --   replace ih := ih σ h z h2
+    --   apply SNi.neu ih
+    -- case red t t' j1 j2 ih1 ih2 =>
+    --   intro z h2
+    --   have lem := ih1 σ h _ h2
+    --   cases lem; case _ z' h2 =>
+    --   apply SNi.red h2.2
+    --   apply ih2 σ h _ h2.1
+    -- case beta t A b j ih =>
+    --   intro z h2
+    --   cases z <;> simp at h2
+    --   case _ x =>
+    --     have lem := IsRen.var_apply_forced x h; simp at lem
+    --     cases lem; case _ k lem =>
+    --     rw [lem] at h2; injection h2
+    --   case _ u v =>
+    --     cases u <;> simp at h2
+    --     case _ x =>
+    --       have lem := IsRen.var_apply_forced x h; simp at lem
+    --       cases lem; case _ k lem =>
+    --       rw [lem] at h2; injection h2.1
+    --     case _ A' u =>
+    --       cases h2; case _ h1 h2 =>
+    --       cases h1; case _ h1 h3 =>
+    --       subst h1
+    --       replace ih := ih σ h _ h2
+    --       subst h2; subst h3; simp at *
+    --       exists (u[.su v :: I]); simp
+    --       apply SNi.beta ih
+    -- case step s s' t j ih =>
+    --   intro z h2
+    --   cases z <;> simp at h2
+    --   case _ x =>
+    --     have lem := IsRen.var_apply_forced x h; simp at lem
+    --     cases lem; case _ k lem =>
+    --     rw [lem] at h2; injection h2
+    --   case _ u v =>
+    --     replace ih := ih σ h _ h2.1
+    --     cases ih; case _ z' h' =>
+    --     exists (z' :@ v); simp [*]
+    --     apply SNi.step (h'.2)
 
   @[simp]
   abbrev SnBetaVarLemmaType : (v : SnVariant) -> (i : SnIndices v) -> Prop
-  | .neu, s => ∀ t x, s = t :@ #x -> SNi .neu t
-  | .nor, s => ∀ t x, s = t :@ #x -> SNi .nor t
+  | .neu, s => ∀ t x, s = t :@ .var x -> SNi .neu t
+  | .nor, s => ∀ t x, s = t :@ .var x -> SNi .nor t
   | .red, _ => True
+
+  theorem test_lift {r : Ren} {σ : Subst Term} :
+    (∀ i x, r i = x -> σ i = Term.var x ∨ σ i = .re x) ->
+    ∀ i x, r.lift i = x -> σ.lift i = Term.var x ∨ σ.lift i = .re x
+  := by
+    intro h1 i x h2
+    cases i <;> simp [Ren.lift] at *
+    case zero => exact h2
+    case succ i =>
+      cases (h1 i)
+      case _ h =>
+        simp [Subst.compose]
+        generalize zdef : σ i = z at *
+        cases z <;> simp at *
+        case _ y => subst h; apply Or.inl; exact h2
+        case _ t => subst h; simp; exact h2
+      case _ h =>
+        simp [Subst.compose]
+        generalize zdef : σ i = z at *
+        cases z <;> simp at *
+        case _ y => subst h; apply Or.inl; exact h2
+
+  theorem test {t : Term} {r : Ren} {σ : Subst Term} :
+    (∀ i x, r i = x -> σ i = Term.var x ∨ σ i = .re x) ->
+    t[r] = t[σ]
+  := by
+    intro h
+    induction t generalizing r σ <;> simp
+    case var x =>
+      have lem := h x (r x) rfl
+      cases lem
+      case _ lem =>
+        rw [lem]
+        simp [Term.from_action, Ren.to]
+      case _ lem =>
+        rw [lem]
+        simp [Term.from_action, Ren.to]
+    case lam A t ih =>
+      replace ih := @ih r.lift σ.lift (test_lift h)
+      rw [Ren.lift_to_commute] at ih; simp at ih
+      rw [ih]
+    case app f a ih1 ih2 =>
+      rw [ih1 h, ih2 h]; simp
 
   theorem beta_var {v i} : SNi v i -> SnBetaVarLemmaType v i := by
     intro j; induction j <;> simp at *
@@ -335,10 +381,17 @@ namespace SNi
       subst e1; subst e2
       cases j1
       case beta A b j1 =>
+        let r : Ren := x :: id
+        have lem : b[.su (.var x) :: +0] = b[r] := by
+          subst r; rw [test]
+          intro i y h
+          cases i <;> simp at *
+          case zero => exact h
+          case _ z => apply Or.inl; exact h
+        rw [lem] at j2
         apply SNi.lam
-        apply @antirename .nor (b[%#x :: I]) (%#x :: I) _ j2
-        rfl; unfold IsRen; intro i
-        cases i <;> simp
+        apply @antirename .nor (b[r]) r j2
+        rfl
       case step s' j1 =>
         replace ih2 := ih2 s' x rfl
         apply SNi.red j1 ih2
@@ -415,7 +468,7 @@ namespace StrongNormalizaton
   @[simp]
   def LR : Ty -> (Term -> Prop)
   | .base => λ t => SNi .nor t
-  | .arrow A B => λ t => ∀ (σ : Subst Term) (v : Term), IsRen σ -> LR A v -> LR B (t[σ] :@ v)
+  | .arrow A B => λ t => ∀ (r : Ren) (v : Term), LR A v -> LR B (t[r] :@ v)
 
   @[simp]
   def GR : List Ty -> (Subst Term -> Prop)
@@ -426,15 +479,15 @@ namespace StrongNormalizaton
 
   notation:170 Γ:170 " ⊨s " t:170 " : " A:170 => SemanticTyping Γ t A
 
-  theorem monotone {A t} (σ : Subst Term) : IsRen σ -> LR A t -> LR A (t[σ]) := by
-    intro h1 h2; induction A generalizing t σ
+  theorem monotone {A t} (r : Ren) : LR A t -> LR A (t[r]) := by
+    intro h; induction A generalizing t r
     case _ =>
       simp at *
-      apply SNi.rename σ h1 h2
+      apply SNi.rename r h
     case _ A B ih1 ih2 =>
-      simp at *; intro σ' v σr lv
-      replace h2 := h2 (σ ∘ σ') v (IsRen.compose h1 σr) lv
-      simp at h2; apply h2
+      simp at *; intro r' v rh
+      replace h := h (r ∘ r') v rh
+      simp at h; sorry
 
   theorem cr {A} :
     (∀ t, LR A t -> SNi .nor t)
@@ -450,27 +503,33 @@ namespace StrongNormalizaton
       apply And.intro
       case _ =>
         intro t h
-        apply @SNi.antirename .nor (t[S]) S IsRen.S _ t rfl
+        apply @SNi.antirename .nor (t[Ren.to (· + 1)]) (· + 1) _ t rfl
         apply @SNi.beta_var .nor _ _ _ 0 rfl
-        replace h := h S #0 IsRen.S (ih1.2.1 #0 SNi.var); simp at h
+        replace h := h (· + 1) (.var 0) (ih1.2.1 (.var 0) SNi.var); simp at h
         apply ih2.1 _ h
       case _ =>
         apply And.intro
         case _ =>
-          intro t h σ v σr lv
+          intro t h r v lr
           apply ih2.2.1
           apply SNi.app
-          apply SNi.rename σ σr h
-          apply ih1.1 _ lv
+          apply SNi.rename r h
+          apply ih1.1 _ lr
         case _ =>
-          intro t t' h1 h2 σ v σr lr
-          have lem1 := h2 σ v σr lr
-          apply ih2.2.2 (t[σ] :@ v) (t'[σ] :@ v) _ lem1
-          replace h1 := SNi.rename σ σr h1; simp at h1
+          intro t t' h1 h2 r v lr
+          have lem1 := h2 r v lr
+          apply ih2.2.2 (t[r] :@ v) (t'[r] :@ v) _ lem1
+          replace h1 := SNi.rename r h1; simp at h1
           apply SNi.step h1
 
-  theorem var {A x} : LR A (#x) := by
+  theorem var {A x} : LR A (.var x) := by
     apply cr.2.1; apply SNi.var
+
+  @[simp]
+  theorem promote_id : Ren.to (T := T) id = +0 := by sorry
+
+  @[simp]
+  theorem promote_succ : Ren.to (T := T) (· + 1) = +1 := by sorry
 
   theorem fundamental {Γ t A} : Γ ⊢ t : A -> Γ ⊨s t : A := by
     intro j; induction j
@@ -479,19 +538,20 @@ namespace StrongNormalizaton
       replace h := h x T j
       generalize zdef : σ x = z at *
       cases z <;> simp [*]
+      all_goals sorry
     case app Γ A B f a j1 j2 ih1 ih2 =>
       simp; intro σ h; simp at ih1
-      replace ih1 := ih1 σ h I (a[σ]) IsRen.I
+      replace ih1 := ih1 σ h id (a[σ])
       simp at ih1; apply ih1
       apply ih2 σ h
     case lam Γ A B t j ih =>
-      simp; intro σ h r v sr lv
-      have lem : t[#0::σ ∘ r ∘ S][%v::I] = t[%v::σ ∘ r] := by simp
-      apply cr.2.2 _ (t[%v::σ ∘ r])
-      have lem2 := @SNi.beta v A (t[#0::σ ∘ r ∘ S]); simp at lem2
+      simp; intro σ h r v lv
+      have lem : t[.re 0::σ ∘ r ∘ +1][.su v :: +0] = t[.su v::σ ∘ r.to] := by simp
+      apply cr.2.2 _ (t[.su v::σ ∘ r.to])
+      have lem2 := @SNi.beta v A (t[.re 0::σ ∘ r ∘ +1]); simp at lem2
       apply lem2
       apply cr.1 _ lv
-      replace ih := ih (%v::σ ∘ r)
+      replace ih := ih (.su v :: σ ∘ r.to)
       apply ih
       simp; intro x T j2
       cases x
@@ -505,18 +565,18 @@ namespace StrongNormalizaton
         generalize zdef : σ x = z at *
         cases z <;> simp at *
         case _ k =>
-          have lem := monotone r sr h; simp at lem
+          have lem := monotone r h; simp at lem
           generalize wdef : r k = w at *
           cases w <;> simp [*]
-        case _ t => apply monotone r sr h
+        case _ t => apply monotone r h
 end StrongNormalizaton
 
 theorem strong_normalization_inductive {Γ t A} : Γ ⊢ t : A -> SNi .nor t := by
   intro j
-  have lem1 : StrongNormalizaton.GR Γ I := by
+  have lem1 : StrongNormalizaton.GR Γ +0 := by
     simp; intro x T h
     apply StrongNormalizaton.var
-  have lem2 := StrongNormalizaton.fundamental j I lem1; simp at lem2
+  have lem2 := StrongNormalizaton.fundamental j +0 lem1; simp at lem2
   apply StrongNormalizaton.cr.1 _ lem2
 
 theorem strong_normalization {Γ t A} : Γ ⊢ t : A -> SN Red t := by

@@ -12,7 +12,7 @@ namespace Term
 end Term
 
 inductive Value : Term -> Prop where
-| var : Value #x
+| var : Value (.var x)
 | app :
   Value f ->
   Value a ->
@@ -36,7 +36,7 @@ theorem value_sound : Value t -> ∀ t', ¬ (t ~> t') := by
     apply ih _ r
 
 inductive VarSpine : Term -> Prop where
-| var : VarSpine #x
+| var : VarSpine (.var x)
 | app :
   VarSpine h ->
   Value t ->
@@ -85,7 +85,7 @@ theorem progress t : Value t ∨ (∃ t', t ~> t') := by
           simp
         case lam A t =>
           apply Or.inr
-          exists (t[.su a :: I])
+          exists (t[.su a :: +0])
           apply Red.beta
         case app f b =>
           apply Or.inl

@@ -33,55 +33,70 @@ instance : Repr Term where
 
 open LeanSubst
 
-instance instPrefixHash_Term : PrefixHash Term where
-  hash := Term.var
-
-namespace Term
-  @[simp]
-  theorem var_def : Term.var x = #x := by simp [PrefixHash.hash]
-
-  @[simp]
-  theorem var_eq : (PrefixHash.hash (T := Term) x = #y) = (x = y) := by
-    simp [-var_def, PrefixHash.hash]
-end Term
-
 infixl:65 " :@ " => Term.app
 notation ":λ[" A "] " t => Term.lam A t
 
+open LeanSubst
+
+@[coe]
+def Term.from_action : Subst.Action Term -> Term
+| .re y => var y
+| .su t => t
+
 @[simp]
-def smap (lf : Subst.Lift Term) (f : Nat -> Subst.Action Term) : Term -> Term
+theorem Term.from_action_id {n} : from_action (+0 n) = var n := by
+  simp [from_action, Subst.id]
+
+@[simp]
+theorem Term.from_action_succ {n} : from_action (+1 n) = var (n + 1) := by
+  simp [from_action, Subst.succ]
+
+@[simp]
+theorem Term.from_acton_re {n} : from_action (.re n) = var n := by simp [from_action]
+
+@[simp]
+theorem Term.from_action_su {t} : from_action (.su t) = t := by simp [from_action]
+
+instance instCoe_SubstActionTerm_Term : Coe (Subst.Action Term) Term where
+  coe := Term.from_action
+
+@[simp]
+def smap (k : Subst.Kind) (lf : Subst.Lift Term k) (f : SplitSubst Term k) : Term -> Term
 | .var x =>
-  match f x with
-  | .re y => #y
-  | .su t => t
-| t1 :@ t2 => smap lf f t1 :@ smap lf f t2
-| :λ[A] t => :λ[A] smap lf (lf f) t
+  match k with
+  | .re => .var (f x)
+  | .su => f x
+| t1 :@ t2 => smap k lf f t1 :@ smap k lf f t2
+| :λ[A] t => :λ[A] smap k lf (lf f) t
 
 instance SubstMap_Term : SubstMap Term where
   smap := smap
 
 @[simp]
-instance HasSimpleVar_Term : HasSimpleVar Term where
-  var := Term.var
-  smap := by solve_simple_var_smap
-
-@[simp]
-theorem subst_var {σ : Subst Term} : (#x)[σ] = match σ x with | .re y => #y | .su t => t := by
+theorem subst_var {σ x} : (Term.var x)[σ] = σ x := by
   unfold Subst.apply; simp [SubstMap.smap]
 
 @[simp]
-theorem subst_app : (t1 :@ t2)[σ] = t1[σ] :@ t2[σ] := by
+theorem subst_app {σ t1 t2} : (t1 :@ t2)[σ] = t1[σ] :@ t2[σ] := by
   unfold Subst.apply; simp [SubstMap.smap]
 
 @[simp]
-theorem subst_lam : (:λ[A] t)[σ] = :λ[A] t[σ.lift] := by
+theorem subst_lam {σ A t} : (:λ[A] t)[σ] = :λ[A] t[σ.lift] := by
   unfold Subst.apply; simp [SubstMap.smap]
 
-theorem apply_id {t : Term} : t[I] = t := by
+@[simp]
+theorem Term.from_action_compose {x} {σ τ : Subst Term}
+  : (from_action (σ x))[τ] = from_action ((σ ∘ τ) x)
+:= by
+  simp [Term.from_action, Subst.compose]
+  generalize zdef : σ x = z
+  cases z <;> simp [Term.from_action]
+
+theorem apply_id {t : Term} : t[+0] = t := by
   induction t
   all_goals (simp at * <;> try simp [*])
 
-theorem apply_stable {r : Ren} {σ : Subst Term}
+theorem apply_stable (r : Ren) (σ : Subst Term)
   : r.to = σ -> Ren.apply r = Subst.apply σ
 := by solve_stable r, σ
 
@@ -96,14 +111,5 @@ instance SubstMapCompose_Term : SubstMapCompose Term where
   apply_compose := apply_compose
 
 inductive Neutral : Term -> Prop where
-| var : Neutral #x
+| var : Neutral (.var x)
 | app : Neutral f -> Neutral (f :@ a)
-
-namespace Term
-  @[simp]
-  def from_action : Subst.Action Term -> Term
-  | .su t => t
-  | .re k => #k
-end Term
-
-prefix:max "↑" => Term.from_action
