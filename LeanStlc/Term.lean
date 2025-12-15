@@ -33,6 +33,7 @@ instance : Repr Term where
 
 open LeanSubst
 
+prefix:max "#" => Term.var
 infixl:65 " :@ " => Term.app
 notation ":λ[" A "] " t => Term.lam A t
 
@@ -40,19 +41,19 @@ open LeanSubst
 
 @[coe]
 def Term.from_action : Subst.Action Term -> Term
-| .re y => var y
+| .re y => #y
 | .su t => t
 
 @[simp]
-theorem Term.from_action_id {n} : from_action (+0 n) = var n := by
+theorem Term.from_action_id {n} : from_action (+0 n) = #n := by
   simp [from_action, Subst.id]
 
 @[simp]
-theorem Term.from_action_succ {n} : from_action (+1 n) = var (n + 1) := by
+theorem Term.from_action_succ {n} : from_action (+1 n) = #(n + 1) := by
   simp [from_action, Subst.succ]
 
 @[simp]
-theorem Term.from_acton_re {n} : from_action (.re n) = var n := by simp [from_action]
+theorem Term.from_acton_re {n} : from_action (.re n) = #n := by simp [from_action]
 
 @[simp]
 theorem Term.from_action_su {t} : from_action (.su t) = t := by simp [from_action]
@@ -64,7 +65,7 @@ instance instCoe_SubstActionTerm_Term : Coe (Subst.Action Term) Term where
 def smap (k : Subst.Kind) (lf : Subst.Lift Term k) (f : SplitSubst Term k) : Term -> Term
 | .var x =>
   match k with
-  | .re => .var (f x)
+  | .re => #(f x)
   | .su => f x
 | t1 :@ t2 => smap k lf f t1 :@ smap k lf f t2
 | :λ[A] t => :λ[A] smap k lf (lf f) t
@@ -73,7 +74,7 @@ instance SubstMap_Term : SubstMap Term where
   smap := smap
 
 @[simp]
-theorem subst_var {σ x} : (Term.var x)[σ] = σ x := by
+theorem subst_var {σ x} : (#x)[σ] = σ x := by
   unfold Subst.apply; simp [SubstMap.smap]
 
 @[simp]
@@ -111,5 +112,55 @@ instance SubstMapCompose_Term : SubstMapCompose Term where
   apply_compose := apply_compose
 
 inductive Neutral : Term -> Prop where
-| var : Neutral (.var x)
+| var : Neutral #x
 | app : Neutral f -> Neutral (f :@ a)
+
+theorem to_ren_is_var {t : Term} {r : Ren} : t = Term.from_action (r.to x) -> ∃ y, t = #y := by
+  intro h
+  generalize zdef : r.to x = z at *
+  cases z <;> simp at *
+  case _ i => subst h; exists i
+  case _ t' => subst h; simp [Ren.to] at zdef
+
+theorem ren_subst_apply_eq_lift {r : Ren} {σ : Subst Term} :
+  (∀ i x, r i = x -> σ i = #x ∨ σ i = .re x) ->
+  ∀ i x, r.lift i = x -> σ.lift i = #x ∨ σ.lift i = .re x
+:= by
+  intro h1 i x h2
+  cases i <;> simp [Ren.lift] at *
+  case zero => exact h2
+  case succ i =>
+    cases (h1 i)
+    case _ h =>
+      simp [Subst.compose]
+      generalize zdef : σ i = z at *
+      cases z <;> simp at *
+      case _ y => subst h; apply Or.inl; exact h2
+      case _ t => subst h; simp; exact h2
+    case _ h =>
+      simp [Subst.compose]
+      generalize zdef : σ i = z at *
+      cases z <;> simp at *
+      case _ y => subst h; apply Or.inl; exact h2
+
+theorem ren_subst_apply_eq {t : Term} {r : Ren} {σ : Subst Term} :
+  (∀ i x, r i = x -> σ i = #x ∨ σ i = .re x) ->
+  t[r] = t[σ]
+:= by
+  intro h
+  induction t generalizing r σ <;> simp
+  case var x =>
+    have lem := h x (r x) rfl
+    cases lem
+    case _ lem =>
+      rw [lem]
+      simp [Term.from_action, Ren.to]
+    case _ lem =>
+      rw [lem]
+      simp [Term.from_action, Ren.to]
+  case lam A t ih =>
+    replace ih := @ih r.lift σ.lift (ren_subst_apply_eq_lift h)
+    rw [Ren.to_lift] at ih; simp at ih
+    rw [ih]
+  case app f a ih1 ih2 =>
+    rw [ih1 h, ih2 h]; simp

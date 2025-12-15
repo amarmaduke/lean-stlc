@@ -12,7 +12,7 @@ namespace Term
 end Term
 
 inductive Value : Term -> Prop where
-| var : Value (.var x)
+| var : Value #x
 | app :
   Value f ->
   Value a ->
@@ -36,7 +36,7 @@ theorem value_sound : Value t -> ∀ t', ¬ (t ~> t') := by
     apply ih _ r
 
 inductive VarSpine : Term -> Prop where
-| var : VarSpine (.var x)
+| var : VarSpine #x
 | app :
   VarSpine h ->
   Value t ->

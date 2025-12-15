@@ -13,13 +13,8 @@ inductive Red : Term -> Term -> Prop where
 
 infix:80 " ~> " => Red
 infix:81 " ~>* " => Star Red
-
-inductive RedSubstAction : Subst.Action Term -> Subst.Action Term -> Prop where
-| su {t t'} : t ~> t' -> RedSubstAction (.su t) (.su t')
-| re {x} : RedSubstAction (.re x) (.re x)
-
-infix:80 " ~s> " => RedSubstAction
-infix:81 " ~s>* " => Star RedSubstAction
+infix:80 " ~s> " => ActionRed Red
+infix:81 " ~s>* " => Star (ActionRed Red)
 
 inductive ParRed : Term -> Term -> Prop where
 | var {x} : ParRed (.var x) (.var x)
@@ -37,13 +32,8 @@ inductive ParRed : Term -> Term -> Prop where
 
 infix:80 " ~p> " => ParRed
 infix:81 " ~p>* " => Star ParRed
-
-inductive ParRedSubstAction : Subst.Action Term -> Subst.Action Term -> Prop where
-| su {t t'} : t ~p> t' -> ParRedSubstAction (.su t) (.su t')
-| re {x} : ParRedSubstAction (.re x) (.re x)
-
-infix:80 " ~ps> " => ParRedSubstAction
-infix:81 " ~ps>* " => Star ParRedSubstAction
+infix:80 " ~ps> " => ActionRed ParRed
+infix:81 " ~ps>* " => Star (ActionRed ParRed)
 
 namespace ParRed
   theorem refl {t} : t ~p> t := by
@@ -92,9 +82,9 @@ namespace ParRed
     generalize zpdef : σ' x = z' at *
     cases z <;> cases z'
     all_goals (cases h; try simp [*])
-    apply ParRedSubstAction.re
+    apply ActionRed.re
     case _ r =>
-      apply ParRedSubstAction.su
+      apply ActionRed.su
       apply subst _ r
 
   theorem subst_red_lift {σ σ' : Subst Term} :
@@ -103,7 +93,7 @@ namespace ParRed
   := by
     intro h x
     cases x <;> simp
-    case _ => apply ParRedSubstAction.re
+    case _ => apply ActionRed.re
     case _ x =>
       have lem := subst_action (· + 1) (h x); simp at lem
       apply lem
@@ -147,8 +137,8 @@ namespace ParRed
     case beta ih1 ih2 =>
       apply hsubst
       intro x; cases x <;> simp
-      apply ParRedSubstAction.su; apply ih2
-      apply ParRedSubstAction.re; apply ih1
+      apply ActionRed.su; apply ih2
+      apply ActionRed.re; apply ih1
     case app f f' a a' r1 r2 ih1 ih2 =>
       cases f <;> simp at *
       case var => apply ParRed.app ih1 ih2
@@ -195,9 +185,9 @@ namespace Red
     generalize zpdef : σ' x = z' at *
     cases z <;> cases z'
     all_goals (cases h; try simp [*])
-    apply RedSubstAction.re
+    apply ActionRed.re
     case _ r =>
-      apply RedSubstAction.su
+      apply ActionRed.su
       apply subst _ r
 
   theorem subst_red_lift {σ σ' : Subst Term} :
@@ -206,7 +196,7 @@ namespace Red
   := by
     intro h x
     cases x <;> simp
-    case _ => apply RedSubstAction.re
+    case _ => apply ActionRed.re
     case _ x =>
       have lem := subst_action (· + 1) (h x); simp at lem
       apply lem
@@ -252,14 +242,14 @@ namespace Red
     case _ => apply Star.refl
     case _ r1 r2 ih =>
       apply Star.step ih
-      apply ParRedSubstAction.su r2
+      apply ActionRed.su r2
 
   theorem seqs_action_lift : t ~>* t' -> .su t ~s>* .su t' := by
     intro r; induction r
     case _ => apply Star.refl
     case _ r1 r2 ih =>
       apply Star.step ih
-      apply RedSubstAction.su r2
+      apply ActionRed.su r2
 
   theorem seqs_action_destruct : a ~s>* .su t' -> ∃ t, a = .su t ∧ t ~>* t' := by
     intro r

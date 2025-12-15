@@ -7,7 +7,7 @@ open LeanSubst
 inductive Typing : List Ty -> Term -> Ty -> Prop where
 | var {Γ T x} :
   Γ[x]? = .some T ->
-  Typing Γ (.var x) T
+  Typing Γ #x T
 | app {Γ A B f a} :
   Typing Γ f (A -t> B) ->
   Typing Γ a A ->
@@ -19,8 +19,8 @@ inductive Typing : List Ty -> Term -> Ty -> Prop where
 notation:170 Γ:170 " ⊢ " t:170 " : " A:170 => Typing Γ t A
 
 theorem typing_renaming_lift {Γ Δ} A {r : Ren} :
-  (∀ x T, Γ ⊢ .var x : T -> Δ ⊢ .var (r x) : T) ->
-  ∀ x T, (A::Γ) ⊢ .var x : T -> (A::Δ) ⊢ .var (r.lift x) : T
+  (∀ x T, Γ ⊢ #x : T -> Δ ⊢ #(r x) : T) ->
+  ∀ x T, (A::Γ) ⊢ #x : T -> (A::Δ) ⊢ #(r.lift x) : T
 := by
   intro h x T j
   simp [Ren.lift]; cases x <;> simp at *
@@ -37,7 +37,7 @@ theorem typing_renaming_lift {Γ Δ} A {r : Ren} :
 
 theorem typing_weaken {Γ t A} Δ (r : Ren) :
   Γ ⊢ t : A ->
-  (∀ x T, Γ ⊢ .var x : T -> Δ ⊢ .var (r x) : T) ->
+  (∀ x T, Γ ⊢ #x : T -> Δ ⊢ #(r x) : T) ->
   Δ ⊢ Ren.apply r t : A
 := by
   intro j h
@@ -57,8 +57,8 @@ theorem typing_weaken {Γ t A} Δ (r : Ren) :
     apply ih
 
 theorem typing_subst_lift {Γ Δ} A {σ : Subst Term} :
-  (∀ x T, Γ ⊢ .var x : T -> Δ ⊢ σ x : T) ->
-  ∀ x T, (A::Γ) ⊢ .var x : T -> (A::Δ) ⊢ σ.lift x : T
+  (∀ x T, Γ ⊢ #x : T -> Δ ⊢ σ x : T) ->
+  ∀ x T, (A::Γ) ⊢ #x : T -> (A::Δ) ⊢ σ.lift x : T
 := by
   intro h x T j
   cases j; case _ j =>
@@ -80,7 +80,7 @@ theorem typing_subst_lift {Γ Δ} A {σ : Subst Term} :
 
 theorem typing_subst {Γ t A} Δ (σ : Subst Term) :
   Γ ⊢ t : A ->
-  (∀ x T, Γ ⊢ .var x : T -> Δ ⊢ σ x : T) ->
+  (∀ x T, Γ ⊢ #x : T -> Δ ⊢ σ x : T) ->
   Δ ⊢ t[σ] : A
 := by
   intro j h
