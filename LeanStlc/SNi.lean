@@ -333,7 +333,7 @@ namespace SNi
           intro i y h
           cases i <;> simp at *
           case zero => exact h
-          case _ z => apply Or.inl; exact h
+          case _ z => exact h
         rw [lem] at j2
         apply SNi.lam
         apply @antirename .nor (b[r]) r j2

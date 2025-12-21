@@ -135,13 +135,13 @@ theorem ren_subst_apply_eq_lift {r : Ren} {σ : Subst Term} :
       simp [Subst.compose]
       generalize zdef : σ i = z at *
       cases z <;> simp at *
-      case _ y => subst h; apply Or.inl; exact h2
+      case _ y => subst h; exact h2
       case _ t => subst h; simp; exact h2
     case _ h =>
       simp [Subst.compose]
       generalize zdef : σ i = z at *
       cases z <;> simp at *
-      case _ y => subst h; apply Or.inl; exact h2
+      case _ y => subst h; exact h2
 
 theorem ren_subst_apply_eq {t : Term} {r : Ren} {σ : Subst Term} :
   (∀ i x, r i = x -> σ i = #x ∨ σ i = .re x) ->

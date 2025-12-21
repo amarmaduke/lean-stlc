@@ -1,4 +1,5 @@
 
+import Std.Tactic.Do
 import LeanStlc.Typing
 
 namespace Ty

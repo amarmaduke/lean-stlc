@@ -82,7 +82,7 @@ namespace WeakNormalization
       apply lem
 end WeakNormalization
 
-theorem weak_termination {t A} : [] ⊢ t : A -> ∃ v, t ~>* v ∧ WeakValue v := by
+theorem weak_termination {t A} : .nil ⊢ t : A -> ∃ v, t ~>* v ∧ WeakValue v := by
   intro j
   have lem := WeakNormalization.fundamental j
   simp at lem
@@ -92,12 +92,12 @@ theorem weak_termination {t A} : [] ⊢ t : A -> ∃ v, t ~>* v ∧ WeakValue v 
   exists v
   apply And.intro lem.1 weak
 
-theorem consistency_lemma {t} : [] ⊢ t : ⊤ -> WeakValue t -> False := by
+theorem consistency_lemma {t} : .nil ⊢ t : ⊤ -> WeakValue t -> False := by
   intro h1 h2
   cases t <;> simp [WeakValue] at *
   case lam A b => cases h1
 
-theorem consistency {t} : ¬ ([] ⊢ t : ⊤) := by
+theorem consistency {t} : ¬ (.nil ⊢ t : ⊤) := by
   intro h
   have lem := weak_termination h
   cases lem; case _ v lem =>
