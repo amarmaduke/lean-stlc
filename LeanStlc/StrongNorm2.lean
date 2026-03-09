@@ -264,7 +264,6 @@ namespace ℒ
         apply And.intro; apply Red.nrec3 e1; simp; apply e2
       all_goals try (cases wdef)
 
-
   theorem rename (r : Ren) : ℒ A t -> ℒ A t[r] := by
     intro h
     induction h
@@ -659,16 +658,55 @@ namespace ℰ
       apply Or.inr
       apply Exists.intro n'; apply And.intro; rfl; apply r
 
-  theorem nrec_succ : ℰ A z -> ℰ (A -t> A) s -> ℰ A (.nrec A z s n) -> ℰ A (.nrec A z s n.succ) := by
-    intro h1 h2 h3
-    generalize wdef : Term.nrec A z s n = w at h3
-    apply ind3 (P := λ z s n => ℰ A (Term.nrec A z s n))
-    intro z' s' n' j1 j2 j3 ih1 ih2 ih3
+  -- theorem nrec_succ : ℰ A z -> ℰ (A -t> A) s -> ℰ A (.nrec A z s n) -> ℰ A (.nrec A z s n.succ) := by
+  --   intro h1 h2 h3
+  --   generalize wdef : Term.nrec A z s n = w at h3
+  --   apply ind3 (P := λ z s n => ℰ A (Term.nrec A z s n))
+  --   intro z' s' n' j1 j2 j3 ih1 ih2 ih3
+  --   apply ℒ.lift sorry sorry
+  --   intro t' r
+  --   cases r
+
+  theorem from_natlike : NatLike n -> ℰ Ty.nat n := by
+    intro j; induction j
+    case zero =>
+      apply ℒ.lift (by simp) (by simp)
+      intro t' r; cases r
+    case succ n j ih =>
+      apply ℒ.lift (by simp)
+      case _ =>
+        simp; intro r
+        -- we need: NatLike n -> NatLike n[r] for any renaming r
+        -- renaming is always going to be a no-op because no variables in n
+        sorry
+      case _ =>
+        intro t' r
+        exfalso; cases r; case _ n' r =>
+        -- n is NatLike
+        -- hence: n is a Value
+        -- hence: n does not step
+        exfalso
+        sorry
+
+  theorem nrec_value_succ_lemma :
+    ℰ A z ->
+    ℰ (A -t> A) s ->
+    ℰ Ty.nat n ->
+    ℰ A (s :@ .nrec A z s n) ->
+    ℰ A (Term.nrec A z s n.succ)
+  := by
+    intro j1 j2 j3
+    apply ind3 _ j1 j2 j3
+    intro z s n h1 h2 h3 ih1 ih2 ih3 j4
     apply ℒ.lift sorry sorry
-    intro t' r
-    cases r
-
-
+    intro t' r; cases r; apply j4
+    case _ z' r =>
+      have lem : ℰ A (s :@ .nrec A z' s n) := by
+        apply ℒ.preservation j4
+        apply Red.app2; apply Red.nrec1 r
+      apply ih1 _ r lem
+    case _ r => sorry
+    case _ r => sorry
 
   theorem nrec_value :
     ℰ A z ->
@@ -677,48 +715,13 @@ namespace ℰ
     ℰ A (.nrec A z s n)
   := by
     intro j1 j2 j3
-    induction j3
+    induction j3 generalizing z s
     case _ =>
-      apply ind2 _ j1 j2
-      intro z' s' h1 h2 h3 h4
-      apply ℒ.lift
-      case _ =>
-        intro w1; cases w1
-      case _ =>
-        intro w1; cases w1
-      case _ =>
-        intro t' w1
-        cases w1
-        case _ =>
-          apply h1
-        case _ z'' r =>
-          apply h3; apply r
-        case _ s'' r =>
-          apply h4; apply r
-        case _ n' r =>
-          cases r
-    case _ n' j3 ih1 =>
-      apply ℒ.lift sorry sorry
-      intro t' h1
-      cases h1
-
-      -- apply ind2 _ j1 j2
-      -- case _ =>
-      --   intro z' s' h1 h2 h3 h4
-      --   apply ℒ.lift
-      --   case _ =>
-      --     sorry
-      --   case _ =>
-      --     sorry
-      --   case _ =>
-      --     intro t' w1
-      --     cases w1
-      --     case _ =>
-      --       cases ih1
-
-      --       sorry
-
-
+      sorry
+    case _ n h ih =>
+      apply nrec_value_succ_lemma j1 j2 (from_natlike h)
+      apply app j2
+      apply ih j1 j2
 
   theorem nrec :
     ℰ A z ->
@@ -727,69 +730,21 @@ namespace ℰ
     ℰ A (.nrec A z s n)
   := by
     intro j1 j2 j3
-    induction j3
-    case _ t h1 h2 ih1 =>
-      apply ℒ.lift
-      case _ =>
-        sorry
-      case _ =>
-        intro t' r
-        cases r
-        case _ =>
-          apply j1
-        case _ n' =>
-          have lem := progress n'
-          cases lem
-          case _ =>
-            sorry
-          case _ h =>
-            obtain ⟨n'', r⟩ := h
-            replace r := Red.succ r
-            replace ih1 := ih1 r
-            simp at ih1
-            apply ℒ.preservation ih1
-            sorry
-          all_goals sorry
-        all_goals sorry
-    -- apply ind3 _ j1 j2 j3
-    -- intro s t u h1 h2 h3 ih1 ih2 ih3
-    -- apply ℒ.lift
-    -- case _ =>
-    --   intro h; simp at h
-    -- case _ =>
-    --   intro t' r
-    --   have lem := nrec_inv r
-    --   cases lem
-    --   case _ h =>
-    --     rcases h with ⟨e1, e2⟩
-    --     subst e1
-    --     cases r
-    --     case _ =>
-    --       apply h1
-    --     case _ h =>
-    --       apply ih1
-    --       apply h
-    --     case _ h =>
-    --       apply ih2
-    --       apply h
-    --     case _ h =>
-    --       apply ih3
-    --       apply h
-    --   case _ h =>
-    --     cases h
-    --     case _ h =>
-    --       rcases h with ⟨u', e1, e2⟩
-    --       subst e1 e2
-    --       cases h3
-    --       case _ q1 q2 =>
-
-    --         sorry
-    --     case _ h =>
-    --       cases h
-    --       case _ =>
-    --         sorry
-    --       case _ =>
-    --         sorry
+    apply ind3 _ j1 j2 j3
+    intro s t u h1 h2 h3 ih1 ih2 ih3
+    apply ℒ.lift sorry sorry
+    intro t' r
+    cases r
+    case _ => apply h1
+    case _ n =>
+      cases h3; case _ q1 q2 q3 =>
+      simp at q2; replace q2 := q2 id; simp at q2
+      apply app h2
+      cases q2; case _ q2 =>
+      apply nrec_value h1 h2 q2
+    case _ r => apply ih1 _ r
+    case _ r => apply ih2 _ r
+    case _ r => apply ih3 _ r
 
   theorem lam : SN Red b -> ℛ (⟦ (A -t> B) ⟧) (:λ[C] b) -> ℰ (A -t> B) (:λ[C] b) := by
     intro h1 h2
