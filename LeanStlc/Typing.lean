@@ -15,6 +15,16 @@ inductive Typing : List Ty -> Term -> Ty -> Prop where
 | lam {Γ A B t} :
   Typing (A::Γ) t B ->
   Typing Γ (:λ[A] t) (A -t> B)
+| zero :
+  Typing Γ .zero .nat
+| succ :
+  Typing Γ n .nat ->
+  Typing Γ (.succ n) .nat
+| nrec :
+  Typing Γ z A ->
+  Typing Γ s (A -t> A) ->
+  Typing Γ n .nat ->
+  Typing Γ (.nrec A z s n) A
 
 notation:170 Γ:170 " ⊢ " t:170 " : " A:170 => Typing Γ t A
 
@@ -55,6 +65,19 @@ theorem typing_weaken {Γ t A} Δ (r : Ren) :
     apply Typing.lam
     replace ih := ih _ _ (typing_renaming_lift _ h); simp at ih
     apply ih
+  case _ Γ' =>
+    apply Typing.zero
+  case _ Γ' n w ih =>
+    apply Typing.succ
+    apply ih; intro x T w2; apply h; apply w2
+  case _ Γ' z A' s n h1 h2 h3 ih1 ih2 ih3 =>
+    apply Typing.nrec
+    case _ =>
+      apply ih1; intro x T j1; apply h; apply j1
+    case _ =>
+      apply ih2; intro x T j1; apply h; apply j1
+    case _ =>
+      apply ih3; intro x T j1; apply h; apply j1
 
 theorem typing_subst_lift {Γ Δ} A {σ : Subst Term} :
   (∀ x T, Γ ⊢ #x : T -> Δ ⊢ σ x : T) ->
@@ -98,6 +121,15 @@ theorem typing_subst {Γ t A} Δ (σ : Subst Term) :
     simp; apply Typing.lam
     replace ih := ih _ _ (typing_subst_lift _ h)
     simp at ih; apply ih
+  case _ ih =>
+    simp
+    apply Typing.zero
+  case _ ih =>
+    apply Typing.succ
+    apply ih; exact h
+  case _ ih1 ih2 ih3 =>
+    simp
+    apply Typing.nrec; apply ih1; exact h; apply ih2; exact h; apply ih3; exact h
 
 theorem typing_beta {Γ A B b t} : (A::Γ) ⊢ b : B -> Γ ⊢ t : A -> Γ ⊢ b[.su t::+0] : B := by
   intro j1 j2

@@ -10,6 +10,12 @@ inductive Red : Term -> Term -> Prop where
 | app1 {f f' a} : Red f f' -> Red (f :@ a) (f' :@ a)
 | app2 {a a' f} : Red a a' -> Red (f :@ a) (f :@ a')
 | lam {A t t'} : Red t t' -> Red (:λ[A] t) (:λ[A] t')
+| succ : Red n n' -> Red (.succ n) (.succ n')
+| nrec_zero : Red (.nrec A z s .zero) z
+| nrec_succ : Red (.nrec A z s (.succ n)) (s :@ (.nrec A z s n))
+| nrec1 : Red z z' -> Red (.nrec A z s n) (.nrec A z' s n)
+| nrec2 : Red s s' -> Red (.nrec A z s n) (.nrec A z s' n)
+| nrec3 : Red n n' -> Red (.nrec A z s n) (.nrec A z s n')
 
 infix:80 " ~> " => Red
 infix:81 " ~>* " => Star Red
@@ -18,6 +24,10 @@ infix:81 " ~s>* " => Star (ActionRed Red)
 
 inductive ParRed : Term -> Term -> Prop where
 | var {x} : ParRed (.var x) (.var x)
+| zero : ParRed (.zero) (.zero)
+| succ :
+  ParRed n n' ->
+  ParRed (.succ n) (.succ n')
 | beta {A b b' t t'} :
   ParRed b b' ->
   ParRed t t' ->
@@ -29,6 +39,20 @@ inductive ParRed : Term -> Term -> Prop where
 | lam {t t' A} :
   ParRed t t' ->
   ParRed (:λ[A] t) (:λ[A] t')
+| nrec :
+  ParRed z z' ->
+  ParRed s s' ->
+  ParRed n n' ->
+  ParRed (.nrec A z s n) (.nrec A z' s' n')
+| nrec_zero :
+  ParRed z z' ->
+  ParRed s s' ->
+  ParRed (.nrec A z s .zero) z'
+| nrec_succ :
+  ParRed z z' ->
+  ParRed s s' ->
+  ParRed n n' ->
+  ParRed (.nrec A z s (.succ n)) (s' :@ (.nrec A z' s' n'))
 
 infix:80 " ~p> " => ParRed
 infix:81 " ~p>* " => Star ParRed
@@ -41,6 +65,12 @@ namespace ParRed
     case var => apply ParRed.var
     case app ih1 ih2 => apply ParRed.app ih1 ih2
     case lam ih => apply ParRed.lam ih
+    case _ =>
+      apply ParRed.zero
+    case _ ih =>
+      apply ParRed.succ ih
+    case _ ih1 ih2 ih3 =>
+      apply nrec ih1 ih2 ih3
 
   @[simp]
   def complete : Term -> Term
@@ -52,8 +82,18 @@ namespace ParRed
     let f' := complete f
     let a' := complete a
     .app f' a'
+  | .nrec _ z _ .zero =>
+    complete z
+  | .nrec A z s (.succ n) =>
+    let z' := complete z
+    let s' := complete s
+    let n' := complete n
+    s' :@ (.nrec A z' s' n')
   | .lam A t => .lam A (complete t)
   | .var x => .var x
+  | .zero => .zero
+  | .succ n => .succ (complete n)
+  | .nrec A z s n => .nrec A (complete z) (complete s) (complete n)
 
   theorem subst {t t'} (σ : Subst Term) :
     t ~p> t' ->
@@ -71,6 +111,20 @@ namespace ParRed
       apply ih1; apply ih2
     case lam r ih =>
       simp; apply ParRed.lam; apply ih
+    case _ =>
+      simp; apply refl
+    case _ h ih =>
+      simp
+      apply ParRed.succ; apply ih
+    case _ h1 h2 h3 ih1 ih2 ih3 =>
+      simp
+      apply ParRed.nrec; apply ih1; apply ih2; apply ih3
+    case _ ih1 ih2 =>
+      simp
+      apply ParRed.nrec_zero; apply ih1; apply ih2
+    case _ ih1 ih2 ih3 =>
+      simp
+      apply ParRed.nrec_succ; apply ih1; apply ih2; apply ih3
 
   theorem subst_action {x} {σ σ' : Subst Term} (r : Ren) :
     σ x ~ps> σ' x ->
@@ -97,6 +151,15 @@ namespace ParRed
     case _ x =>
       have lem := subst_action (· + 1) (h x); simp at lem
       apply lem
+
+  theorem succ_subst : n ~p> n' -> .succ n ~p> .succ n' := by
+    intro h1
+    apply ParRed.succ; apply h1
+
+  theorem succ_subst2 : .succ n ~p> .succ n' -> n ~p> n' := by
+    intro h1
+    cases h1
+    case _ j1 => apply j1
 
   theorem hsubst {t t'} {σ σ' : Subst Term} :
     (∀ x, σ x ~ps> σ' x) ->
@@ -130,6 +193,31 @@ namespace ParRed
       simp; apply ParRed.lam
       have lem := @ih t' σ.lift σ'.lift (subst_red_lift h1) h2
       simp at lem; apply lem
+    case _ =>
+      simp
+      cases h2
+      simp
+      apply refl
+    case _ a ih =>
+      simp
+      cases h2
+      case _ j1 => simp; apply ParRed.succ; apply ih; apply h1; apply j1
+    case _ ih1 ih2 ih3 =>
+      simp
+      cases h2
+      case _ j1 j2 j3 => simp; apply ParRed.nrec; apply ih1; apply h1; apply j1; apply ih2; apply h1; apply j2; apply ih3; apply h1; apply j3
+      case _ j1 j2 => simp; apply ParRed.nrec_zero; apply ih1; apply h1; apply j2; apply ih2; apply h1; apply j1
+      case _ A s z z' s' n n' j1 j2 j3 =>
+        simp
+        apply ParRed.nrec_succ
+        case _ =>
+          apply ih1; apply h1; apply j2
+        case _ =>
+          apply ih2; apply h1; apply j3
+        case _ =>
+          replace ih3 := @ih3 (.succ n') σ σ' h1 (succ_subst j1)
+          apply succ_subst2; apply ih3
+
 
   theorem triangle {t s} : t ~p> s -> s ~p> complete t := by
     intro r; induction r <;> simp at *
@@ -141,13 +229,50 @@ namespace ParRed
       apply ActionRed.re; apply ih1
     case app f f' a a' r1 r2 ih1 ih2 =>
       cases f <;> simp at *
-      case var => apply ParRed.app ih1 ih2
-      case app => apply ParRed.app ih1 ih2
+      -- case var => apply ParRed.app ih1 ih2
+      -- case app => apply ParRed.app ih1 ih2
       case lam =>
         cases r1; case _ r1 =>
         cases ih1; case _ ih1 =>
         apply ParRed.beta ih1 ih2
+      all_goals apply ParRed.app ih1 ih2
+      -- case _ =>
+      --   apply ParRed.app; apply ih1; apply ih2
+      -- case _ =>
+      --   apply ParRed.app; apply ih1; apply ih2
+      -- case _ =>
+      --   apply ParRed.app; apply ih1; apply ih2
     case lam ih => apply ParRed.lam ih
+    case _ =>
+      apply ParRed.zero
+    case _ ih =>
+      apply ParRed.succ; apply ih
+    case _ n n' A h1 h2 h3 ih1 ih2 ih3 =>
+      cases n
+      case _ =>
+        simp at ih3
+        apply ParRed.nrec; apply ih1; apply ih2; simp; apply ih3
+      case _ =>
+        simp
+        apply ParRed.nrec; apply ih1; apply ih2; apply ih3
+      case _ =>
+        simp
+        apply ParRed.nrec ih1 ih2 ih3
+      case _ =>
+        simp
+        cases h3
+        apply ParRed.nrec_zero; apply ih1; apply ih2
+      case _ =>
+        simp
+        cases h3; apply ParRed.nrec_succ; apply ih1; apply ih2; simp at ih3; apply succ_subst2 ih3
+      case _ =>
+        simp
+        apply ParRed.nrec ih1 ih2 ih3
+    case _ z z' s' s'' A h1 h2 ih1 ih2 =>
+      apply ih1
+    case _ A h1 h2 h3 ih1 ih2 ih3 =>
+      apply ParRed.app ih2
+      apply ParRed.nrec ih1 ih2 ih3
 
   instance : Substitutive ParRed where
     subst := subst
@@ -174,6 +299,24 @@ namespace Red
     case lam ih =>
       simp; apply Red.lam
       apply ih
+    case _ ih1 =>
+      apply Red.succ; apply ih1
+    case _ =>
+      simp
+      apply Red.nrec_zero
+    case _ =>
+      simp
+      apply Red.nrec_succ
+    case _ h1 ih1 =>
+      simp
+      apply Red.nrec1
+      apply ih1
+    case _ ih1 =>
+      simp
+      apply Red.nrec2
+      apply ih1
+    case _ ih1 =>
+      simp; apply Red.nrec3; apply ih1
 
   theorem subst_action {x} {σ σ' : Subst Term} (r : Ren) :
     σ x ~s> σ' x ->
@@ -207,6 +350,22 @@ namespace Red
     case app1 r ih => apply ParRed.app ih ParRed.refl
     case app2 r ih => apply ParRed.app ParRed.refl ih
     case lam r ih => apply ParRed.lam ih
+    case _ ih1 =>
+      constructor; assumption
+    case _ A z s =>
+      apply ParRed.nrec_zero (z := z) (s' := s)
+      case _ =>
+        apply ParRed.refl
+      case _ =>
+        apply ParRed.refl
+    case _ =>
+      apply ParRed.nrec_succ; apply ParRed.refl; apply ParRed.refl; apply ParRed.refl
+    case _ h1 ih1 =>
+      apply ParRed.nrec; apply ih1; apply ParRed.refl; apply ParRed.refl
+    case _ h1 ih1 =>
+      apply ParRed.nrec (ParRed.refl) ih1 (ParRed.refl)
+    case _ =>
+      apply ParRed.nrec (ParRed.refl) (ParRed.refl); assumption
 
   theorem seqs_implies_pars {t t'} : t ~>* t' -> t ~p>* t' := by
     intro h; induction h
@@ -229,6 +388,22 @@ namespace Red
       apply Star.congr2 Term.app Red.app1 Red.app2 ih1 ih2
     case lam t t' A r ih =>
       apply Star.congr1 (Term.lam A) (@Red.lam A) ih
+    case _ =>
+      constructor
+    case _ ih =>
+      apply Star.congr1; intro t t'; intro h1; apply Red.succ h1
+      apply ih
+    case _ z z' s s' n n' A h1 h2 h3 ih1 ih2 ih3 =>
+      apply Star.congr3; intro t1 t2 t3 t1' j1; apply Red.nrec1 j1; intro t2 t3 t3' t2' j1; apply Red.nrec2 j1; intro t2 t3 t3' t3'' j1; apply Red.nrec3 j1
+      apply ih1; apply ih2; apply ih3
+    case _ z z' s s' A h1 h2 ih1 ih2 =>
+      apply Star.trans; apply Star.step; apply Star.refl; apply Red.nrec_zero; apply ih1
+    case _ z z' s s' n n' A h1 h2 h3 ih1 ih2 ih3 =>
+      apply Star.trans (y := s :@ Term.nrec A z s n); apply Star.step; apply Star.refl; apply Red.nrec_succ;
+      apply Star.trans (y := s :@ (Term.nrec A z' s' n')); apply Star.congr2; intro t1 t2 t1' j1
+      apply Red.app1 j1; intro t1 t2 t2' j1; apply Red.app2 j1; apply Star.refl; apply Star.congr3; intro t1 t2 t3 t1' j1; apply Red.nrec1 j1
+      intro t1 t2 t3 t2' j1; apply Red.nrec2 j1; intro t1 t2 t3 t3' j1; apply Red.nrec3 j1; apply ih1; apply ih2; apply ih3
+      apply Star.congr2; intro t1 t2 t1' j1; apply Red.app1 j1; intro t1 t2 t2' j1; apply Red.app2 j1; apply ih2; apply Star.refl
 
   theorem pars_implies_seqs {t t'} : t ~p>* t' -> t ~>* t' := by
     intro h; induction h
@@ -323,6 +498,14 @@ namespace Red
       replace ih := ih lem
       have lem2 := Star.congr1 (t1 := a[σ.lift]) (t1' := a[σ'.lift]) (:λ[A] ·) (@Red.lam A) ih
       simp at lem2; apply lem2
+    case _ =>
+      apply Star.refl
+    case _ t ih =>
+      apply Star.congr1; intro t t' h2; apply Red.succ h2
+      apply ih h
+    case _ A t t' t'' ih1 ih2 ih3 =>
+      apply Star.congr3; intro t1 t2 t3 t1' h1; apply Red.nrec1 h1; intro t1 t2 t3 t2' h2; apply Red.nrec2 h2
+      intro t1 t2 t3 t3' h1; apply Red.nrec3 h1; apply ih1 h; apply ih2 h; apply ih3 h
 
   theorem confluence {s t1 t2} : s ~>* t1 -> s ~>* t2 -> ∃ t, t1 ~>* t ∧ t2 ~>* t := by
     intro h1 h2

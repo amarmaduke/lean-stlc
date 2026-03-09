@@ -4,6 +4,7 @@ import LeanSubst
 inductive Ty : Type where
 | base : Ty
 | arrow : Ty -> Ty -> Ty
+| nat : Ty
 
 notation "⊤" => Ty.base
 infixr:40 " -t> " => Ty.arrow
@@ -13,6 +14,7 @@ protected def Ty.repr (a : Ty) (p : Nat) : Std.Format :=
   | .base => "⊤"
   | .arrow .base B => Ty.repr .base p ++ " -> " ++ Ty.repr B p
   | .arrow A B => "(" ++ Ty.repr A p ++ ") -> " ++ Ty.repr B p
+  | .nat => "ℕ"
 
 instance : Repr Ty where
   reprPrec := Ty.repr
@@ -21,12 +23,18 @@ inductive Term where
 | var : Nat -> Term
 | app : Term -> Term -> Term
 | lam : Ty -> Term -> Term
+| zero : Term
+| succ : Term -> Term
+| nrec : Ty -> Term -> Term -> Term -> Term
 
 protected def Term.repr (a : Term) (p : Nat) : Std.Format :=
   match a with
   | .var x => "#" ++ Nat.repr x
   | .app f a => "(" ++ Term.repr f p ++ " " ++ Term.repr a p ++ ")"
   | .lam _ t => "(λ " ++ Term.repr t p ++ ")"
+  | .zero => "'0"
+  | .succ n => "S(" ++ Term.repr n p ++ ")"
+  | .nrec A z s n => "(R " ++ Ty.repr A p ++ Term.repr z p ++ Term.repr s p ++ Term.repr n p ++ ")"
 
 instance : Repr Term where
   reprPrec := Term.repr
@@ -69,6 +77,9 @@ def smap (k : Subst.Kind) (lf : Subst.Lift Term k) (f : SplitSubst Term k) : Ter
   | .su => f x
 | t1 :@ t2 => smap k lf f t1 :@ smap k lf f t2
 | :λ[A] t => :λ[A] smap k lf (lf f) t
+| .zero => .zero
+| .succ n => .succ (smap k lf f n)
+| .nrec A z s n => .nrec A (smap k lf f z) (smap k lf f s) (smap k lf f n)
 
 instance SubstMap_Term : SubstMap Term where
   smap := smap
@@ -86,6 +97,20 @@ theorem subst_lam {σ A t} : (:λ[A] t)[σ] = :λ[A] t[σ.lift] := by
   unfold Subst.apply; simp [SubstMap.smap]
 
 @[simp]
+theorem subst_zero : (Term.zero)[σ] = Term.zero := by
+  unfold Subst.apply; simp [SubstMap.smap]
+
+@[simp]
+theorem subst_succ : (Term.succ n)[σ] = Term.succ (n[σ]) := by
+  unfold Subst.apply
+  simp [SubstMap.smap]
+
+@[simp]
+theorem subst_nrec : (Term.nrec A z s n)[σ] = .nrec A (z[σ]) (s[σ]) (n[σ]) := by
+  unfold Subst.apply
+  simp [SubstMap.smap]
+
+@[simp]
 theorem Term.from_action_compose {x} {σ τ : Subst Term}
   : (from_action (σ x))[τ] = from_action ((σ ∘ τ) x)
 := by
@@ -95,7 +120,7 @@ theorem Term.from_action_compose {x} {σ τ : Subst Term}
 
 theorem apply_id {t : Term} : t[+0] = t := by
   induction t
-  all_goals (simp at * <;> try simp [*])
+  all_goals try (simp at * <;> try simp [*])
 
 theorem apply_stable (r : Ren) (σ : Subst Term)
   : r.to = σ -> Ren.apply r = Subst.apply σ
@@ -164,3 +189,20 @@ theorem ren_subst_apply_eq {t : Term} {r : Ren} {σ : Subst Term} :
     rw [ih]
   case app f a ih1 ih2 =>
     rw [ih1 h, ih2 h]; simp
+  case _ h1 ih =>
+    apply ih
+    apply h
+  case _ A t1 t2 t3 ih1 ih2 ih3 =>
+    apply And.intro
+    apply ih1
+    apply h
+    apply And.intro
+    apply ih2
+    apply h
+    apply ih3
+    apply h
+
+@[coe]
+def Ty.from_action : Subst.Action Ty -> Ty
+| .re _ => base
+| .su t => t
