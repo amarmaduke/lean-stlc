@@ -31,6 +31,7 @@ inductive ℒ (S : SnModelSet) : SnModelSet where
 
 inductive NatLike : SnModelSet where
 | zero : NatLike .zero
+--| var : NatLike (.var x)
 | succ {n} : NatLike n -> NatLike (.succ n)
 
 @[simp]
@@ -667,6 +668,24 @@ namespace ℰ
   --   intro t' r
   --   cases r
 
+  theorem natlike_renaming : NatLike n -> NatLike n[r] := by
+    intro h
+    induction h
+    case _ =>
+      simp
+      apply NatLike.zero
+    case _ n' h1 ih1 =>
+      simp
+      apply NatLike.succ ih1
+
+  theorem natlike_value : NatLike n -> Value n := by
+    intro h
+    induction h
+    case _ =>
+      apply Value.zero
+    case _ n' h ih =>
+      apply Value.succ ih
+
   theorem from_natlike : NatLike n -> ℰ Ty.nat n := by
     intro j; induction j
     case zero =>
@@ -675,18 +694,21 @@ namespace ℰ
     case succ n j ih =>
       apply ℒ.lift (by simp)
       case _ =>
-        simp; intro r
+        intro h
+        simp only [ℛ]
+        intro r
+        apply natlike_renaming
+        apply NatLike.succ j
         -- we need: NatLike n -> NatLike n[r] for any renaming r
         -- renaming is always going to be a no-op because no variables in n
-        sorry
       case _ =>
         intro t' r
         exfalso; cases r; case _ n' r =>
+        replace j := natlike_value j
+        apply value_sound j n' r
         -- n is NatLike
         -- hence: n is a Value
         -- hence: n does not step
-        exfalso
-        sorry
 
   theorem nrec_value_succ_lemma :
     ℰ A z ->
@@ -698,15 +720,28 @@ namespace ℰ
     intro j1 j2 j3
     apply ind3 _ j1 j2 j3
     intro z s n h1 h2 h3 ih1 ih2 ih3 j4
-    apply ℒ.lift sorry sorry
+    apply ℒ.lift; intro w1; cases w1; intro w1; cases w1
     intro t' r; cases r; apply j4
     case _ z' r =>
       have lem : ℰ A (s :@ .nrec A z' s n) := by
         apply ℒ.preservation j4
         apply Red.app2; apply Red.nrec1 r
       apply ih1 _ r lem
-    case _ r => sorry
-    case _ r => sorry
+    case _ s' r =>
+      have lem : ℰ A (s' :@ .nrec A z s n) := by
+        apply ℒ.preservation j4
+        apply Red.app1 r
+      have lem2 : ℰ A (s' :@ .nrec A z s' n) := by
+        apply ℒ.preservation lem
+        apply Red.app2; apply Red.nrec2 r
+      apply ih2 _ r lem2
+    case _ n' r =>
+      cases r
+      case _ n' r =>
+        apply ih3 _ r
+        apply ℒ.preservation j4
+        apply Red.app2
+        apply Red.nrec3 r
 
   theorem nrec_value :
     ℰ A z ->
@@ -717,7 +752,24 @@ namespace ℰ
     intro j1 j2 j3
     induction j3 generalizing z s
     case _ =>
-      sorry
+      apply ind2 _ j1 j2
+      intro z' s' h1 h2 h3 h4
+      apply ℒ.lift
+      case _ =>
+        intro w1; cases w1
+      case _ =>
+        intro w1; cases w1
+      case _ =>
+        intro t' w1
+        cases w1
+        case _ =>
+          apply h1
+        case _ z'' r =>
+          apply h3; apply r
+        case _ s'' r =>
+          apply h4; apply r
+        case _ n' r =>
+          cases r
     case _ n h ih =>
       apply nrec_value_succ_lemma j1 j2 (from_natlike h)
       apply app j2
@@ -732,7 +784,7 @@ namespace ℰ
     intro j1 j2 j3
     apply ind3 _ j1 j2 j3
     intro s t u h1 h2 h3 ih1 ih2 ih3
-    apply ℒ.lift sorry sorry
+    apply ℒ.lift; intro w1; cases w1; intro w1; cases w1
     intro t' r
     cases r
     case _ => apply h1
@@ -755,6 +807,8 @@ namespace ℰ
         intro w1
         apply h2
       case _ =>
+        intro w1; apply h2
+      case _ =>
         intro t' w1
         cases w1
         case _ t' w1 =>
@@ -773,12 +827,16 @@ namespace ℰ
 
   theorem succ : ℰ Ty.nat n -> ℰ Ty.nat n.succ := by
     intro h
-    induction h; case _ t j1 j2 ih =>
+    induction h; case _ t j1 j2 ih1 ih2 =>
     apply ℒ.lift; intro r; simp at r
-    intro t' r
-    cases r
-    case _ n' r =>
-      apply ih; apply r
+    case _ =>
+      intro h r
+      sorry
+    case _ =>
+      intro t' r
+      cases r
+      case _ n' t' =>
+        apply ih2 t'
 
 end ℰ
 

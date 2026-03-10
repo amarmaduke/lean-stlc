@@ -21,6 +21,8 @@ inductive Value : Term -> Prop where
 | lam :
   Value t ->
   Value (:λ[A] t)
+| zero : Value Term.zero
+| succ : Value n -> Value (Term.succ n)
 
 theorem value_sound : Value t -> ∀ t', ¬ (t ~> t') := by
   intro j t' r
@@ -34,6 +36,12 @@ theorem value_sound : Value t -> ∀ t', ¬ (t ~> t') := by
   case lam j ih =>
     cases r; case _ r =>
     apply ih _ r
+  case zero =>
+    cases r
+  case succ n h ih =>
+    cases r
+    case _ n' j1 =>
+      apply ih n' j1
 
 inductive VarSpine : Term -> Prop where
 | var : VarSpine #x
@@ -69,6 +77,11 @@ theorem lam_value :
   case lam t A' v ih =>
     cases j; case _ j =>
     apply Or.inl; apply Exists.intro _; rfl
+  case _ =>
+
+    sorry
+  case _ =>
+    sorry
 
 theorem progress t : Value t ∨ (∃ t', t ~> t') := by sorry
   -- induction t
