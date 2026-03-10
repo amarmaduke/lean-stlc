@@ -318,7 +318,7 @@ end ℒ
 
 namespace ℛ
 
-  theorem lam : ℛ ⟦A -t> B⟧ (:λ[C] b) <-> ∀ (r:Ren) a, ℰ A a -> ℰ B b[su a::r] := by
+  theorem lam : ℛ ⟦A -t> B⟧ (:λ[C] b) <-> ∀ (r:Ren) a, ℰ A a -> ℰ B b[su a::r.to] := by
     sorry
     -- apply Iff.intro
     -- case _ =>

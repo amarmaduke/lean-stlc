@@ -70,45 +70,46 @@ instance instCoe_SubstActionTerm_Term : Coe (Subst.Action Term) Term where
   coe := Term.from_action
 
 @[simp]
-def smap (k : Subst.Kind) (lf : Subst.Lift Term k) (f : SplitSubst Term k) : Term -> Term
-| .var x =>
-  match k with
-  | .re => #(f x)
-  | .su => f x
-| t1 :@ t2 => smap k lf f t1 :@ smap k lf f t2
-| :λ[A] t => :λ[A] smap k lf (lf f) t
-| .zero => .zero
-| .succ n => .succ (smap k lf f n)
-| .nrec A z s n => .nrec A (smap k lf f z) (smap k lf f s) (smap k lf f n)
+def Term.rmap (r : Ren) : Term -> Term
+| #x => #(r x)
+| t1 :@ t2 => rmap r t1 :@ rmap r t2
+| :λ[A] t => :λ[A] rmap r.lift t
+| zero => zero
+| succ n => succ (rmap r n)
+| nrec A z s n => nrec A (rmap r z) (rmap r s) (rmap r n)
 
-instance SubstMap_Term : SubstMap Term where
-  smap := smap
+instance : RenMap Term where
+  rmap := Term.rmap
 
 @[simp]
-theorem subst_var {σ x} : (#x)[σ] = σ x := by
-  unfold Subst.apply; simp [SubstMap.smap]
+def Term.smap (σ : Subst Term) : Term -> Term
+| #x => σ x
+| t1 :@ t2 => smap σ t1 :@ smap σ t2
+| :λ[A] t => :λ[A] smap σ.lift t
+| zero => zero
+| succ n => succ (smap σ n)
+| nrec A z s n => nrec A (smap σ z) (smap σ s) (smap σ n)
 
-@[simp]
-theorem subst_app {σ t1 t2} : (t1 :@ t2)[σ] = t1[σ] :@ t2[σ] := by
-  unfold Subst.apply; simp [SubstMap.smap]
+instance SubstMap_Term : SubstMap Term Term where
+  smap := Term.smap
 
-@[simp]
-theorem subst_lam {σ A t} : (:λ[A] t)[σ] = :λ[A] t[σ.lift] := by
-  unfold Subst.apply; simp [SubstMap.smap]
+@[simp, grind =]
+theorem subst_var {σ x} : (#x)[σ] = σ x := by simp [SubstMap.smap]
 
-@[simp]
-theorem subst_zero : (Term.zero)[σ] = Term.zero := by
-  unfold Subst.apply; simp [SubstMap.smap]
+@[simp, grind =]
+theorem subst_app {σ t1 t2} : (t1 :@ t2)[σ] = t1[σ] :@ t2[σ] := by simp [SubstMap.smap]
 
-@[simp]
-theorem subst_succ : (Term.succ n)[σ] = Term.succ (n[σ]) := by
-  unfold Subst.apply
-  simp [SubstMap.smap]
+@[simp, grind =]
+theorem subst_lam {σ A t} : (:λ[A] t)[σ] = :λ[A] t[σ.lift] := by simp [SubstMap.smap]
 
-@[simp]
-theorem subst_nrec : (Term.nrec A z s n)[σ] = .nrec A (z[σ]) (s[σ]) (n[σ]) := by
-  unfold Subst.apply
-  simp [SubstMap.smap]
+@[simp, grind =]
+theorem subst_zero : (Term.zero)[σ] = Term.zero := by simp [SubstMap.smap]
+
+@[simp, grind =]
+theorem subst_succ : (Term.succ n)[σ] = Term.succ (n[σ]) := by simp [SubstMap.smap]
+
+@[simp, grind =]
+theorem subst_nrec : (Term.nrec A z s n)[σ] = .nrec A (z[σ]) (s[σ]) (n[σ]) := by simp [SubstMap.smap]
 
 @[simp]
 theorem Term.from_action_compose {x} {σ τ : Subst Term}
@@ -122,18 +123,20 @@ theorem apply_id {t : Term} : t[+0] = t := by
   induction t
   all_goals try (simp at * <;> try simp [*])
 
+instance : SubstMapId Term Term where
+  apply_id := apply_id
+
 theorem apply_stable (r : Ren) (σ : Subst Term)
-  : r.to = σ -> Ren.apply r = Subst.apply σ
-:= by solve_stable r, σ
+  : r = σ -> rmap (T := Term) r = smap σ
+:= by subst_solve_stable r, σ
 
 instance SubstMapStable_Term : SubstMapStable Term where
-  apply_id := apply_id
   apply_stable := apply_stable
 
 theorem apply_compose {s : Term} {σ τ : Subst Term} : s[σ][τ] = s[σ ∘ τ] := by
-  solve_compose Term, s, σ, τ
+  subst_solve_compose Term, s, σ, τ
 
-instance SubstMapCompose_Term : SubstMapCompose Term where
+instance SubstMapCompose_Term : SubstMapCompose Term Term where
   apply_compose := apply_compose
 
 inductive Neutral : Term -> Prop where
@@ -185,22 +188,8 @@ theorem ren_subst_apply_eq {t : Term} {r : Ren} {σ : Subst Term} :
       simp [Term.from_action, Ren.to]
   case lam A t ih =>
     replace ih := @ih r.lift σ.lift (ren_subst_apply_eq_lift h)
-    rw [Ren.to_lift] at ih; simp at ih
-    rw [ih]
-  case app f a ih1 ih2 =>
-    rw [ih1 h, ih2 h]; simp
-  case _ h1 ih =>
-    apply ih
-    apply h
-  case _ A t1 t2 t3 ih1 ih2 ih3 =>
-    apply And.intro
-    apply ih1
-    apply h
-    apply And.intro
-    apply ih2
-    apply h
-    apply ih3
-    apply h
+    grind
+  all_goals grind
 
 @[coe]
 def Ty.from_action : Subst.Action Ty -> Ty

@@ -6,10 +6,12 @@ import LeanStlc.SNi
 open LeanSubst
 
 namespace StrongNormalizaton
+
   @[simp]
   def LR : Ty -> (Term -> Prop)
   | .base => λ t => SNi .nor t
   | .arrow A B => λ t => ∀ (r : Ren) (v : Term), LR A v -> LR B (t[r] :@ v)
+  | .nat => λ t => ∀ (A : Ty) (z s : Term), LR A z -> LR (A -t> A) s -> LR A (.nrec A z s t)
 
   @[simp]
   def GR : List Ty -> (Subst Term -> Prop)

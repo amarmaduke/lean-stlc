@@ -48,7 +48,7 @@ theorem typing_renaming_lift {Γ Δ} A {r : Ren} :
 theorem typing_weaken {Γ t A} Δ (r : Ren) :
   Γ ⊢ t : A ->
   (∀ x T, Γ ⊢ #x : T -> Δ ⊢ #(r x) : T) ->
-  Δ ⊢ Ren.apply r t : A
+  Δ ⊢ t[r] : A
 := by
   intro j h
   induction j generalizing Δ r
@@ -64,7 +64,7 @@ theorem typing_weaken {Γ t A} Δ (r : Ren) :
   case lam j ih =>
     apply Typing.lam
     replace ih := ih _ _ (typing_renaming_lift _ h); simp at ih
-    apply ih
+    rw [Ren.to_lift] at ih; apply ih
   case _ Γ' =>
     apply Typing.zero
   case _ Γ' n w ih =>
@@ -97,9 +97,9 @@ theorem typing_subst_lift {Γ Δ} A {σ : Subst Term} :
     unfold Subst.compose; simp
     generalize zdef : σ x = z at *
     cases z <;> simp at *
-    apply lem
-    rw [SubstMapStable.apply_stable (· + 1) +1 (by rw [Ren.to_succ])] at lem
-    apply lem
+    all_goals
+      simp [Term.from_action, Subst.compose] at lem
+      rw [zdef] at lem; simp at lem; apply lem
 
 theorem typing_subst {Γ t A} Δ (σ : Subst Term) :
   Γ ⊢ t : A ->
@@ -134,7 +134,7 @@ theorem typing_subst {Γ t A} Δ (σ : Subst Term) :
 theorem typing_beta {Γ A B b t} : (A::Γ) ⊢ b : B -> Γ ⊢ t : A -> Γ ⊢ b[.su t::+0] : B := by
   intro j1 j2
   apply typing_subst Γ (.su t::+0) j1 (λ x T h => by {
-    simp; cases x <;> simp
+    simp [Term.from_action]; cases x <;> simp
     case _ =>
       cases h; case _ h =>
       simp at h; subst h
