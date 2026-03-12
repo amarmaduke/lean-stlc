@@ -25,7 +25,7 @@ def is_succ : Term -> Bool
 inductive ℒ (S : SnModelSet) : SnModelSet where
 | lift {t : Term} :
   (is_lam t -> ℛ S t) ->
-  (is_succ t -> S t) -> --originally was only S t
+  (is_succ t -> ℛ S t) -> --originally was only S t
   (∀ {t' : Term}, t ~> t' -> ℒ S t') ->
   ℒ S t
 
@@ -39,6 +39,7 @@ inductive NatModel : SnModelSet where
 | succ {n} :
   (∀ {t' : Term}, n ~>* t' -> NatModel t') ->
   NatModel (Term.succ n)
+--| var : NatModel (.var x)
 
 @[simp]
 abbrev 𝒜 (A B : SnModelSet) : SnModelSet := λ t => ∀ a, ℒ A a -> ℒ B t[su a::+0]
@@ -81,7 +82,9 @@ namespace ℒ
       apply h2
 
   theorem var x : ℒ A #x := by
-    sorry
+    apply ℒ.lift; simp; simp
+    intro t' r
+    cases r
     -- apply ℒ.lift
     -- case _ =>
     --   simp
@@ -273,7 +276,44 @@ namespace ℒ
       all_goals try (cases wdef)
 
   theorem rename (r : Ren) : ℒ A t -> ℒ A t[r] := by
-    sorry
+    intro h
+    induction h
+    case _ t h1 h2 h3 ih =>
+      apply ℒ.lift
+      case _ =>
+        intro h
+        cases t
+        case var n =>
+          cases h
+        all_goals try (simp at h)
+        case _ a b =>
+          simp at h1
+          simp only [ℛ] at *
+          intro r'
+          replace h1 := h1 (r' ∘ r)
+          simp at *
+          apply h1
+      case _ =>
+        intro h
+        cases t
+        case var n =>
+          cases h
+        all_goals try (simp at h)
+        case _ n => --couldn't prove this without ℛ
+          simp at *
+          simp only [ℛ] at *
+          simp at *
+          intro r'
+          replace h2 := h2 (r' ∘ r)
+          simp at h2
+          apply h2
+      case _ =>
+        intro t'' h5
+        have lem := Red.antirename r h5
+        rcases lem with ⟨z, e1, e2⟩
+        subst e2
+        apply ih e1
+
     -- intro h
     -- induction h
     -- case _ t' h1 h2 ih1 ih2 =>
@@ -319,98 +359,97 @@ end ℒ
 namespace ℛ
 
   theorem lam : ℛ ⟦A -t> B⟧ (:λ[C] b) <-> ∀ (r:Ren) a, ℰ A a -> ℰ B b[su a::r] := by
-    sorry
-    -- apply Iff.intro
-    -- case _ =>
-    --   intro h1 r a h2
-    --   simp only [ℛ] at h1
-    --   simp only [ℰ] at *
-    --   apply ℒ.lift
-    --   case _ =>
-    --     intro h3
-    --     simp at h1
-    --     simp only [ℛ]
-    --     intro r'
-    --     simp
-    --     replace h1 := h1 (r) a h2
-    --     simp at h1
-    --     cases h1
-    --     case _ h4 h5 h6 =>
-    --       replace h4 := h4 h3
-    --       simp only [ℛ] at h4
-    --       replace h4 := h4 r'
-    --       simp at h4; apply h4
-    --   case _ =>
-    --     intro h3
-    --     simp at h1
-    --     replace h1 := h1 (r) a h2
-    --     simp at h1
-    --     cases h1
-    --     case _ j1 j2 j3 =>
-    --       replace j2 := j2 h3; apply j2
-    --   case _ =>
-    --     intro t' h3
-    --     apply ℒ.lift
-    --     case _ =>
-    --       intro h4
-    --       simp only [ℛ]
-    --       intro r'
-    --       simp at h1
-    --       replace h1 := h1 r a h2
-    --       cases h1
-    --       case _ h5 h6 =>
-    --         replace h6 := @h6 t' h3
-    --         cases h6
-    --         case _ h6 h7 h8 h9 =>
-    --           replace h7 := h7 h4
-    --           simp only [ℛ] at h7
-    --           apply h7
-    --     case _ =>
-    --       intro h4
-    --       simp at h1
-    --       replace h1 := h1 r a h2
-    --       cases h1
-    --       case _ j1 j2 j3 =>
-    --         replace j3 := @j3 t' h3
-    --         cases j3
-    --         case _ w1 w2 w3 =>
-    --           apply w2 h4
-    --     case _ =>
-    --       intro t'' h4
-    --       simp at h1
-    --       replace h1 := h1 r a h2
-    --       cases h1
-    --       case _ h5 h6 =>
-    --         replace h6 := @h6 t' h3
-    --         cases h6
-    --         case _ h6 h7 =>
-    --           replace h7 := @h7 t'' h4; apply h7
-    -- case _ =>
-    --   intro h1
-    --   simp only [ℛ]
-    --   intro r
-    --   simp
-    --   intro a h2
-    --   apply ℒ.lift
-    --   case _ =>
-    --     intro h3
-    --     simp only [ℰ] at h1
-    --     replace h1 := h1 r a h2
-    --     cases h1
-    --     case _ h4 h5 h6 => apply h4; apply h3
-    --   case _ =>
-    --     intro h3
-    --     replace h1 := h1 r a h2
-    --     simp only [ℰ] at h1
-    --     cases h1
-    --     case _ j1 j2 j3 =>
-    --       apply j2 h3
-    --   case _ =>
-    --     intro t h3
-    --     replace h1 := h1 r a h2
-    --     cases h1
-    --     case _ h4 h5 =>
-    --       apply h5; apply h3
+    apply Iff.intro
+    case _ =>
+      intro h1 r a h2
+      simp only [ℛ] at h1
+      simp only [ℰ] at *
+      apply ℒ.lift
+      case _ =>
+        intro h3
+        simp at h1
+        simp only [ℛ]
+        intro r'
+        simp
+        replace h1 := h1 (r) a h2
+        simp at h1
+        cases h1
+        case _ h4 h5 h6 =>
+          replace h4 := h4 h3
+          simp only [ℛ] at h4
+          replace h4 := h4 r'
+          simp at h4; apply h4
+      case _ =>
+        intro h3
+        simp at h1
+        replace h1 := h1 (r) a h2
+        simp at h1
+        cases h1
+        case _ j1 j2 j3 =>
+          replace j2 := j2 h3; apply j2
+      case _ =>
+        intro t' h3
+        apply ℒ.lift
+        case _ =>
+          intro h4
+          simp only [ℛ]
+          intro r'
+          simp at h1
+          replace h1 := h1 r a h2
+          cases h1
+          case _ h5 h6 =>
+            replace h6 := @h6 t' h3
+            cases h6
+            case _ h6 h7 h8 h9 =>
+              replace h7 := h7 h4
+              simp only [ℛ] at h7
+              apply h7
+        case _ =>
+          intro h4
+          simp at h1
+          replace h1 := h1 r a h2
+          cases h1
+          case _ j1 j2 j3 =>
+            replace j3 := @j3 t' h3
+            cases j3
+            case _ w1 w2 w3 =>
+              apply w2 h4
+        case _ =>
+          intro t'' h4
+          simp at h1
+          replace h1 := h1 r a h2
+          cases h1
+          case _ h5 h6 =>
+            replace h6 := @h6 t' h3
+            cases h6
+            case _ h6 h7 =>
+              replace h7 := @h7 t'' h4; apply h7
+    case _ =>
+      intro h1
+      simp only [ℛ]
+      intro r
+      simp
+      intro a h2
+      apply ℒ.lift
+      case _ =>
+        intro h3
+        simp only [ℰ] at h1
+        replace h1 := h1 r a h2
+        cases h1
+        case _ h4 h5 h6 => apply h4; apply h3
+      case _ =>
+        intro h3
+        replace h1 := h1 r a h2
+        simp only [ℰ] at h1
+        cases h1
+        case _ j1 j2 j3 =>
+          apply j2 h3
+      case _ =>
+        intro t h3
+        replace h1 := h1 r a h2
+        cases h1
+        case _ h4 h5 =>
+          apply h5; apply h3
 
 end ℛ
 
@@ -432,31 +471,30 @@ namespace 𝒞
       apply h2 T h3
 
   theorem re : 𝒞 Γ σ -> 𝒞 (A::Γ) (re x::σ) := by
-    sorry
-    -- intro h1
-    -- simp only [𝒞] at *
-    -- intro n
-    -- cases n
-    -- case _ =>
-    --   simp
-    --   replace h1 := h1 0
-    --   simp at h1
-    --   simp only [ℰ]
-    --   apply ℒ.lift
-    --   case _ =>
-    --     intro h3
-    --     simp only [ℛ]
-    --     cases h3
-    --   case _ =>
-    --     intro h3
-    --     cases h3
-    --   case _ =>
-    --     intro t'
-    --     intro h3
-    --     cases h3
-    -- case _ n =>
-    --   simp
-    --   replace h1 := h1 n; apply h1
+    intro h1
+    simp only [𝒞] at *
+    intro n
+    cases n
+    case _ =>
+      simp
+      replace h1 := h1 0
+      simp at h1
+      simp only [ℰ]
+      apply ℒ.lift
+      case _ =>
+        intro h3
+        simp only [ℛ]
+        cases h3
+      case _ =>
+        intro h3
+        cases h3
+      case _ =>
+        intro t'
+        intro h3
+        cases h3
+    case _ n =>
+      simp
+      replace h1 := h1 n; apply h1
 
   def rename {σ : Subst Term} (r : Ren) : 𝒞 Γ σ -> 𝒞 Γ (σ ∘ r.to) := by
     intro h1
@@ -492,43 +530,42 @@ namespace ℰ
     ℰ B t ->
     P s t
   := by
-    sorry
-    -- intro h j1 j2
-    -- induction j1 generalizing t
-    -- case _ s' q1 q2 q3 qih =>
-    --   induction j2
-    --   case _ t'' j3 j4 j5 ih2 =>
-    --     apply h
-    --     case _ =>
-    --       apply ℒ.lift
-    --       case _ =>
-    --         intro w
-    --         replace q1 := q1 w
-    --         apply q1
-    --       case _ =>
-    --         exact q2
-    --       case _ =>
-    --         intro w
-    --         intro w2
-    --         apply q3; apply w2
-    --     case _ =>
-    --       apply ℒ.lift
-    --       case _ =>
-    --         intro w1
-    --         replace j3 := j3 w1; apply j3
-    --       case _ =>
-    --         exact j4
-    --       case _ =>
-    --         intro t'''
-    --         exact j5
-    --     case _ =>
-    --       intro s'' r
-    --       apply qih r
-    --       apply ℒ.lift j3 j4
-    --       exact j5
-    --     case _ =>
-    --       intro a
-    --       replace ih2 := @ih2 a; intro w; replace ih2 := ih2 w; apply ih2
+    intro h j1 j2
+    induction j1 generalizing t
+    case _ s' q1 q2 q3 qih =>
+      induction j2
+      case _ t'' j3 j4 j5 ih2 =>
+        apply h
+        case _ =>
+          apply ℒ.lift
+          case _ =>
+            intro w
+            replace q1 := q1 w
+            apply q1
+          case _ =>
+            exact q2
+          case _ =>
+            intro w
+            intro w2
+            apply q3; apply w2
+        case _ =>
+          apply ℒ.lift
+          case _ =>
+            intro w1
+            replace j3 := j3 w1; apply j3
+          case _ =>
+            exact j4
+          case _ =>
+            intro t'''
+            exact j5
+        case _ =>
+          intro s'' r
+          apply qih r
+          apply ℒ.lift j3 j4
+          exact j5
+        case _ =>
+          intro a
+          replace ih2 := @ih2 a; intro w; replace ih2 := ih2 w; apply ih2
 
   theorem ind3 {P : Term -> Term -> Term -> Prop} :
     (∀ s t u,
@@ -544,35 +581,34 @@ namespace ℰ
     ℰ C u ->
     P s t u
   := by
-    sorry
-      -- intro m j1 j2 j3
-      -- induction j1 generalizing t u
-      -- case _ s' h1 h2 h3 ih1 =>
-      --   induction j2 generalizing u
-      --   case _ t' h4 h5 h6 ih2 =>
-      --     induction j3
-      --     case _ u' h7 h8 h9 ih3 =>
-      --       apply m
-      --       case _ =>
-      --         apply ℒ.lift; exact h1; exact h2; exact h3
-      --       case _ =>
-      --         apply ℒ.lift; exact h4; exact h5; exact h6
-      --       case _ =>
-      --         apply ℒ.lift; exact h7; exact h8; exact h9
-      --       case _ =>
-      --         intro s'' r
-      --         apply ih1 r
-      --         case _ =>
-      --           apply ℒ.lift h4 h5 h6
-      --         case _ =>
-      --           apply ℒ.lift h7 h8 h9
-      --       case _ =>
-      --         intro t'' r
-      --         apply ih2 r
-      --         apply ℒ.lift h7 h8 h9
-      --       case _ =>
-      --         intro u'' r
-      --         apply ih3 r
+      intro m j1 j2 j3
+      induction j1 generalizing t u
+      case _ s' h1 h2 h3 ih1 =>
+        induction j2 generalizing u
+        case _ t' h4 h5 h6 ih2 =>
+          induction j3
+          case _ u' h7 h8 h9 ih3 =>
+            apply m
+            case _ =>
+              apply ℒ.lift; exact h1; exact h2; exact h3
+            case _ =>
+              apply ℒ.lift; exact h4; exact h5; exact h6
+            case _ =>
+              apply ℒ.lift; exact h7; exact h8; exact h9
+            case _ =>
+              intro s'' r
+              apply ih1 r
+              case _ =>
+                apply ℒ.lift h4 h5 h6
+              case _ =>
+                apply ℒ.lift h7 h8 h9
+            case _ =>
+              intro t'' r
+              apply ih2 r
+              apply ℒ.lift h7 h8 h9
+            case _ =>
+              intro u'' r
+              apply ih3 r
 
   theorem app_inv :
   (f:@ a) ~> t ->
@@ -599,41 +635,40 @@ namespace ℰ
     ℰ A a ->
     ℰ B (f :@ a)
   := by
-    sorry
-    -- intro j1 j2
-    -- apply ind2 _ j1 j2
-    -- intro s t h1 h2 ih1 ih2
-    -- apply ℒ.lift
-    -- case _ =>
-    --   simp
-    -- case _ =>
-    --   intro h3
-    --   cases h3
-    -- case _ =>
-    --   intro t' w1
-    --   have lem := app_inv w1
-    --   rcases lem with ⟨A', b, e3⟩
-    --   case _ =>
-    --     rcases e3 with ⟨e4, e5⟩
-    --     subst e4 e5
-    --     cases h1
-    --     case _ h1 h3 h4 =>
-    --       simp only [ℛ] at h1
-    --       simp at h1
-    --       apply h1
-    --       simp only [ℰ] at h2
-    --       apply h2
-    --   case _ h3 =>
-    --     rcases h3 with ⟨f', e1, e2⟩
-    --     case _ =>
-    --       subst e1
-    --       apply ih1
-    --       apply e2
-    --     case _ h3 =>
-    --       rcases h3 with ⟨a', e1, e2⟩
-    --       subst e1
-    --       apply ih2
-    --       apply e2
+    intro j1 j2
+    apply ind2 _ j1 j2
+    intro s t h1 h2 ih1 ih2
+    apply ℒ.lift
+    case _ =>
+      simp
+    case _ =>
+      intro h3
+      cases h3
+    case _ =>
+      intro t' w1
+      have lem := app_inv w1
+      rcases lem with ⟨A', b, e3⟩
+      case _ =>
+        rcases e3 with ⟨e4, e5⟩
+        subst e4 e5
+        cases h1
+        case _ h1 h3 h4 =>
+          simp only [ℛ] at h1
+          simp at h1
+          apply h1
+          simp only [ℰ] at h2
+          apply h2
+      case _ h3 =>
+        rcases h3 with ⟨f', e1, e2⟩
+        case _ =>
+          subst e1
+          apply ih1
+          apply e2
+        case _ h3 =>
+          rcases h3 with ⟨a', e1, e2⟩
+          subst e1
+          apply ih2
+          apply e2
 
   theorem nrec_inv :
     .nrec A z s n ~> t ->
@@ -692,39 +727,81 @@ namespace ℰ
       simp
       apply NatLike.succ ih1
 
-  theorem natlike_value : NatLike n -> Value n := by
+  theorem Red.antirename_star {r : Ren} : n'[r] ~>* t' -> ∃ t'', t' = t''[r] ∧ n' ~>* t'' := by
+    intro h
+    induction h
+    case _ =>
+      apply Exists.intro n'
+      apply And.intro; rfl; apply Star.refl
+    case _ y z h1 h2 ih =>
+      rcases ih with ⟨t'', e1, e2⟩
+      subst e1
+      replace h2 := ℒ.Red.antirename r h2
+      rcases h2 with ⟨z', e3, e4⟩
+      apply Exists.intro z'
+      apply And.intro; apply e4
+      apply Star.step; apply e2; apply e3
+
+  theorem natmodel_renaming {r : Ren} : NatModel n -> NatModel n[r] := by
+    intro h
+    induction h generalizing r
+    case _ =>
+      simp
+      apply NatModel.zero
+    case _ n' h ih =>
+      simp
+      apply NatModel.succ
+      intro t' r'
+      have lem : ∃ t'', ∃(k : Ren), t' = t''[k] ∧ n' ~>* t'' := by
+        replace r' := Red.antirename_star r'
+        rcases r' with ⟨t'', e1, e2⟩
+        apply Exists.intro t''
+        apply Exists.intro r
+        apply And.intro; apply e1; apply e2
+      obtain ⟨t'', k, h1, h2⟩ := lem
+      subst h1
+      apply ih h2
+
+
+
+  theorem natmodel_value : NatModel n -> Value n := by
     intro h
     induction h
     case _ =>
       apply Value.zero
     case _ n' h ih =>
-      apply Value.succ ih
+      apply Value.succ
+      case _ =>
+        apply ih
+        apply Star.refl
 
-  theorem from_natlike : NatLike n -> ℰ Ty.nat n := by
-    sorry
-    -- intro j; induction j
-    -- case zero =>
-    --   apply ℒ.lift (by simp) (by simp)
-    --   intro t' r; cases r
-    -- case succ n j ih =>
-    --   apply ℒ.lift (by simp)
-    --   case _ =>
-    --     intro h
-    --     simp only [ℛ]
-    --     intro r
-    --     sorry
-    --     -- apply natlike_renaming
-    --     -- apply NatLike.succ j
-    --     -- we need: NatLike n -> NatLike n[r] for any renaming r
-    --     -- renaming is always going to be a no-op because no variables in n
-    --   case _ =>
-    --     intro t' r
-    --     exfalso; cases r; case _ n' r =>
-    --     replace j := natlike_value j
-    --     apply value_sound j n' r
-    --     -- n is NatLike
-    --     -- hence: n is a Value
-    --     -- hence: n does not step
+  theorem from_natmodel : NatModel n -> ℰ Ty.nat n := by
+    intro j; induction j
+    case zero =>
+      apply ℒ.lift (by simp) (by simp)
+      intro t' r; cases r
+    case succ n j ih =>
+      apply ℒ.lift (by simp)
+      case _ =>
+        intro h
+        simp only [ℛ]
+        intro r
+        apply natmodel_renaming
+        apply NatModel.succ
+        exact j
+        -- apply natlike_renaming
+        -- apply NatLike.succ j
+        -- we need: NatLike n -> NatLike n[r] for any renaming r
+        -- renaming is always going to be a no-op because no variables in n
+      case _ =>
+        intro t' r
+        exfalso; cases r; case _ n' r =>
+        replace j := @j n Star.refl
+        replace j := natmodel_value j
+        apply value_sound j n' r
+        -- n is NatLike
+        -- hence: n is a Value
+        -- hence: n does not step
 
   theorem nrec_value_succ_lemma :
     ℰ A z ->
@@ -793,35 +870,35 @@ namespace ℰ
     --   apply app j2
     --   apply ih j1 j2
 
-  mutual
-    def test1 (j1 : ℰ A z) (j2 : ℰ (A -t> A) s) : NatModel n -> ℰ A (.nrec A z s n)
-    | .zero => .lift (by simp) (by simp) (by {
-      intro t' r; cases r
-      case _ => sorry
-      case _ => sorry
-      case _ s' r =>
-        sorry
-      case _ => sorry
-    })
-    | .succ j3 =>
-      have lem := test2 j1 j2 j3
-      sorry
+  -- mutual
+  --   def test1 (j1 : ℰ A z) (j2 : ℰ (A -t> A) s) : NatModel n -> ℰ A (.nrec A z s n)
+  --   | .zero => .lift (by simp) (by simp) (by {
+  --     intro t' r; cases r
+  --     case _ => sorry
+  --     case _ => sorry
+  --     case _ s' r =>
+  --       sorry
+  --     case _ => sorry
+  --   })
+  --   | .succ j3 =>
+  --     have lem := test2 j1 j2 j3
+  --     sorry
 
-    def test2 : ℰ A z -> ℰ (A -t> A) s -> ℰ Ty.nat n -> ℰ A (.nrec A z s n)
-    | .lift h1 q1 j1, .lift h2 q2 j2, .lift h3 q3 j3 => .lift (by simp) (by simp) (by {
-      intro t' r; cases r
-      case _ => sorry
-      case _ =>
-        apply app (.lift h2 q2 j2)
-        replace q3 := q3 rfl
-        cases q3; case _ q3 =>
-        apply test2 (.lift h1 q1 j1) (.lift h2 q2 j2) (q3 rfl)
-      case _ z' r => exact test2 (j1 r) (.lift h2 q2 j2) (.lift h3 q3 j3)
-      case _ => sorry
-      case _ => sorry
-    })
+  --   def test2 : ℰ A z -> ℰ (A -t> A) s -> ℰ Ty.nat n -> ℰ A (.nrec A z s n)
+  --   | .lift h1 q1 j1, .lift h2 q2 j2, .lift h3 q3 j3 => .lift (by simp) (by simp) (by {
+  --     intro t' r; cases r
+  --     case _ => sorry
+  --     case _ =>
+  --       apply app (.lift h2 q2 j2)
+  --       replace q3 := q3 rfl
+  --       cases q3; case _ q3 =>
+  --       apply test2 (.lift h1 q1 j1) (.lift h2 q2 j2) (q3 rfl)
+  --     case _ z' r => exact test2 (j1 r) (.lift h2 q2 j2) (.lift h3 q3 j3)
+  --     case _ => sorry
+  --     case _ => sorry
+  --   })
 
-  end mutual
+  -- end mutual
 
   theorem nrec2 :
     ℰ A z ->
@@ -849,11 +926,7 @@ namespace ℰ
     case _ n' =>
       apply app h2
       cases h3; case _ q1 q2 q3 =>
-      simp at q2;
-      cases q2; case _ q2 =>
-
-
-      sorry
+      simp at q2; sorry
     case _ => sorry
     case _ => sorry
     case _ => sorry
@@ -903,12 +976,58 @@ namespace ℰ
     --         apply h2
     --         apply w2
 
+
+  theorem your_mom : ¬(NatModel (.succ #x)) := by
+    intro h
+    cases h
+    case _ h =>
+      replace h := @h (#x) Star.refl
+      have lem : ¬(NatModel #x) := by
+        cases h
+      apply lem h
+
+  theorem your_dad : ¬(ℰ Ty.nat (#x).succ) := by
+    intro h
+    cases h
+    case _ h1 h2 h3 =>
+      simp at h2
+      simp only [ℛ] at h2
+      replace h2 := h2 id
+      simp at h2
+      apply your_mom h2
+
+  theorem your_mom2 : ¬(NatLike (.succ #x)) := by
+    intro h
+    cases h
+    case _ h =>
+      cases h
+
   theorem succ : ℰ Ty.nat n -> ℰ Ty.nat n.succ := by
-    intro j; induction j; case _ t j1 j2 ih =>
+    intro j; induction j
+    case _ t j1 j2 ih1 ih2 =>
     apply ℒ.lift (by simp)
     case _ =>
-      intro t' r; cases r; case _ t' r =>
-      apply ih r
+      intro re r
+      apply natmodel_renaming
+      apply NatModel.succ
+      intro t' h
+      cases t
+      case _ n =>
+
+        sorry
+      case _ =>
+
+        sorry
+      case _ =>
+        sorry
+      case _ =>
+        sorry
+      case _ =>
+        sorry
+      case _ =>
+        sorry
+    case _ =>
+      sorry
     -- intro h
     -- induction h; case _ t j1 j2 ih1 ih2 =>
     -- apply ℒ.lift; intro r; simp at r
