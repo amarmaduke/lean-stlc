@@ -524,14 +524,15 @@ namespace Red
     confluence := confluence
 
   theorem preservation_of_neutral_step : Neutral t -> t ~> t' -> Neutral t' := by
-    intro h r
-    induction h generalizing t'
-    case _ => cases r
-    case _ f a h ih =>
-      cases r
-      case _ => cases h
-      case _ f' r => apply Neutral.app (ih r)
-      case _ a' r => apply Neutral.app h
+    sorry
+    -- intro h r
+    -- induction h generalizing t'
+    -- case _ => cases r
+    -- case _ f a h ih =>
+    --   cases r
+    --   case _ => cases h
+    --   case _ f' r => apply Neutral.app (ih r)
+    --   case _ a' r => apply Neutral.app h
 
   theorem preservation_of_neutral : Neutral t -> t ~>* t' -> Neutral t' := by
     intro h r

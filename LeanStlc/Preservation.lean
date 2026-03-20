@@ -4,29 +4,18 @@ import LeanStlc.Typing
 
 open LeanSubst
 
-theorem preservation_step {Γ A t t'} : Γ ⊢ t : A -> t ~> t' -> Γ ⊢ t' : A := by
-  intro j r
-  induction j generalizing t'
-  case var => cases r
-  case app j1 j2 ih1 ih2 =>
-    cases r
-    case beta =>
-      cases j1; case _ j1 =>
-      apply typing_beta j1 j2
-    case app1 r =>
-      replace ih1 := ih1 r
-      apply Typing.app ih1 j2
-    case app2 r =>
-      replace ih2 := ih2 r
-      apply Typing.app j1 ih2
-  case lam j ih =>
-    cases r
-    case lam r =>
-      replace ih := ih r
-      apply Typing.lam ih
+def Typing.preservation_step : Γ ⊢ t : A -> t ~> t' -> Γ ⊢ t' : A
+| app (lam t) a, .beta => beta t a
+| app f a, .app1 r => app (f.preservation_step r) a
+| app f a, .app2 r => app f (a.preservation_step r)
+| lam t, .lam r => lam (t.preservation_step r)
+| succ t, .succ r => succ (t.preservation_step r)
+| nrec z s n, .nrec_zero => z
+| nrec z s (succ n), .nrec_succ => app s (nrec z s n)
+| nrec z s n, .nrec1 r => nrec (z.preservation_step r) s n
+| nrec z s n, .nrec2 r => nrec z (s.preservation_step r) n
+| nrec z s n, .nrec3 r => nrec z s (n.preservation_step r)
 
-theorem preservation {Γ A t t'} : Γ ⊢ t : A -> t ~>* t' -> Γ ⊢ t' : A := by
-  intro j r
-  induction r
-  case _ => apply j
-  case _ r1 r2 ih => apply preservation_step ih r2
+def Typing.preservation (j : Γ ⊢ t : A) : t ~>* t' -> Γ ⊢ t' : A
+| .refl => j
+| .step r1 r2 => (preservation j r1).preservation_step r2

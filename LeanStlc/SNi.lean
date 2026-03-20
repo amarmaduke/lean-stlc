@@ -182,7 +182,7 @@ mutual
   inductive SnNeu : Term -> Prop
   | var : SnNeu #x
   | app : SnNeu s -> SnNor t -> SnNeu (s :@ t)
-  | nrec : SnNeu t -> SnNor z -> SnNor s -> SnNeu (.nrec A z s t)
+  | nrec : SnNor z -> SnNor s -> SnNeu t -> SnNeu (.nrec A z s t)
 
   inductive SnRed : Term -> Term -> Prop
   | beta : SnNor t -> SnRed ((:λ[A] b) :@ t) b[su t::+0]
@@ -298,153 +298,153 @@ end
 
 namespace SNi
 
-  @[simp]
-  abbrev SnAntiRenameLemmaType (r : Ren) : (v : SnVariant) -> (i : SnIndices v) -> Prop
-  | .neu, t => ∀ z, t = z[r] -> SNi .neu z
-  | .nor, t => ∀ z, t = z[r] -> SNi .nor z
-  | .red, (t, t') =>
-    ∀ z, t = z[r] ->
-    ∃ z', t' = z'[r] ∧ SNi .red (z, z')
+  -- @[simp]
+  -- abbrev SnAntiRenameLemmaType (r : Ren) : (v : SnVariant) -> (i : SnIndices v) -> Prop
+  -- | .neu, t => ∀ z, t = z[r] -> SNi .neu z
+  -- | .nor, t => ∀ z, t = z[r] -> SNi .nor z
+  -- | .red, (t, t') =>
+  --   ∀ z, t = z[r] ->
+  --   ∃ z', t' = z'[r] ∧ SNi .red (z, z')
 
-  theorem antirename {v i} r : SNi v i -> SnAntiRenameLemmaType r v i := by
-    intro j; induction j generalizing r <;> simp at *
-    case var x =>
-      intro z h
-      cases z <;> simp at h
-      case _ y => apply SNi.var
-    case app s t j1 j2 ih1 ih2 =>
-      intro z h1; cases z <;> simp at h1
-      case _ x => apply SNi.var
-      case _ u v => apply SNi.app (ih1 r _ h1.1) (ih2 r _ h1.2)
-    case lam t A j ih =>
-      intro z h
-      cases z <;> simp at h
-      case _ x => apply SNi.neu; apply SNi.var
-      case _ A' b =>
-        cases h; case _ h1 h2 =>
-        subst h1; apply SNi.lam
-        replace ih := ih (r.lift) b
-        rw [Ren.to_lift] at ih
-        simp at ih; apply ih h2
-    case neu t j ih =>
-      intro z h2
-      replace ih := ih r z h2
-      apply SNi.neu ih
-    case red t t' j1 j2 ih1 ih2 =>
-      intro z h2
-      have lem := ih1 r _ h2
-      cases lem; case _ z' h2 =>
-      apply SNi.red h2.2
-      apply ih2 r _ h2.1
-    case beta t A b j ih =>
-      intro z h2
-      cases z <;> simp at h2
-      case _ x =>
-        have lem := to_ren_is_var h2
-        cases lem; case _ y lem =>
-        injection lem
-      case _ u v =>
-        cases u <;> simp at h2
-        case _ x =>
-          have lem := to_ren_is_var h2.1
-          cases lem; case _ y lem =>
-          injection lem
-        case _ A' u =>
-          cases h2; case _ h1 h2 =>
-          cases h1; case _ h1 h3 =>
-          subst h1
-          replace ih := ih r _ h2
-          subst h2; subst h3; simp at *
-          exists (u[.su v :: +0]); simp
-          apply SNi.beta ih
-    case step s s' t j ih =>
-      intro z h2
-      cases z <;> simp at h2
-      case _ x =>
-        have lem := to_ren_is_var h2
-        cases lem; case _ y lem =>
-        injection lem
-      case _ u v =>
-        replace ih := ih r _ h2.1
-        cases ih; case _ z' h' =>
-        exists (z' :@ v); simp [*]
-        apply SNi.step (h'.2)
+  -- theorem antirename {v i} r : SNi v i -> SnAntiRenameLemmaType r v i := by
+  --   intro j; induction j generalizing r <;> simp at *
+  --   case var x =>
+  --     intro z h
+  --     cases z <;> simp at h
+  --     case _ y => apply SNi.var
+  --   case app s t j1 j2 ih1 ih2 =>
+  --     intro z h1; cases z <;> simp at h1
+  --     case _ x => apply SNi.var
+  --     case _ u v => apply SNi.app (ih1 r _ h1.1) (ih2 r _ h1.2)
+  --   case lam t A j ih =>
+  --     intro z h
+  --     cases z <;> simp at h
+  --     case _ x => apply SNi.neu; apply SNi.var
+  --     case _ A' b =>
+  --       cases h; case _ h1 h2 =>
+  --       subst h1; apply SNi.lam
+  --       replace ih := ih (r.lift) b
+  --       rw [Ren.to_lift] at ih
+  --       simp at ih; apply ih h2
+  --   case neu t j ih =>
+  --     intro z h2
+  --     replace ih := ih r z h2
+  --     apply SNi.neu ih
+  --   case red t t' j1 j2 ih1 ih2 =>
+  --     intro z h2
+  --     have lem := ih1 r _ h2
+  --     cases lem; case _ z' h2 =>
+  --     apply SNi.red h2.2
+  --     apply ih2 r _ h2.1
+  --   case beta t A b j ih =>
+  --     intro z h2
+  --     cases z <;> simp at h2
+  --     case _ x =>
+  --       have lem := to_ren_is_var h2
+  --       cases lem; case _ y lem =>
+  --       injection lem
+  --     case _ u v =>
+  --       cases u <;> simp at h2
+  --       case _ x =>
+  --         have lem := to_ren_is_var h2.1
+  --         cases lem; case _ y lem =>
+  --         injection lem
+  --       case _ A' u =>
+  --         cases h2; case _ h1 h2 =>
+  --         cases h1; case _ h1 h3 =>
+  --         subst h1
+  --         replace ih := ih r _ h2
+  --         subst h2; subst h3; simp at *
+  --         exists (u[.su v :: +0]); simp
+  --         apply SNi.beta ih
+  --   case step s s' t j ih =>
+  --     intro z h2
+  --     cases z <;> simp at h2
+  --     case _ x =>
+  --       have lem := to_ren_is_var h2
+  --       cases lem; case _ y lem =>
+  --       injection lem
+  --     case _ u v =>
+  --       replace ih := ih r _ h2.1
+  --       cases ih; case _ z' h' =>
+  --       exists (z' :@ v); simp [*]
+  --       apply SNi.step (h'.2)
 
-  @[simp]
-  abbrev SnBetaVarLemmaType : (v : SnVariant) -> (i : SnIndices v) -> Prop
-  | .neu, s => ∀ t x, s = t :@ .var x -> SNi .neu t
-  | .nor, s => ∀ t x, s = t :@ .var x -> SNi .nor t
-  | .red, _ => True
+  -- @[simp]
+  -- abbrev SnBetaVarLemmaType : (v : SnVariant) -> (i : SnIndices v) -> Prop
+  -- | .neu, s => ∀ t x, s = t :@ .var x -> SNi .neu t
+  -- | .nor, s => ∀ t x, s = t :@ .var x -> SNi .nor t
+  -- | .red, _ => True
 
-  theorem beta_var {v i} : SNi v i -> SnBetaVarLemmaType v i := by
-    intro j; induction j <;> simp at *
-    case app s t j1 j2 ih1 ih2 =>
-      intro u x e1 e2; subst e1; subst e2
-      apply j1
-    case neu t j ih =>
-      intro u x e
-      cases t <;> simp at e
-      case _ v w =>
-      cases e; case _ e1 e2 =>
-      subst e1; subst e2
-      cases j; case _ j1 j2 =>
-      apply SNi.neu j1
-    case red t t' j1 j2 ih1 ih2 =>
-      intro u x e
-      cases t <;> simp at e
-      case _ v w =>
-      cases e; case _ e1 e2 =>
-      subst e1; subst e2
-      cases j1
-      case beta A b j1 =>
-        let r : Ren := x :: id
-        have lem : b[.su (.var x) :: +0] = b[r] := by
-          subst r; rw [ren_subst_apply_eq]
-          intro i y h
-          cases i <;> simp at *
-          case zero => exact h
-          case _ z => exact h
-        rw [lem] at j2
-        apply SNi.lam
-        apply @antirename .nor (b[r]) r j2
-        rfl
-      case step s' j1 =>
-        replace ih2 := ih2 s' x rfl
-        apply SNi.red j1 ih2
+  -- theorem beta_var {v i} : SNi v i -> SnBetaVarLemmaType v i := by
+  --   intro j; induction j <;> simp at *
+  --   case app s t j1 j2 ih1 ih2 =>
+  --     intro u x e1 e2; subst e1; subst e2
+  --     apply j1
+  --   case neu t j ih =>
+  --     intro u x e
+  --     cases t <;> simp at e
+  --     case _ v w =>
+  --     cases e; case _ e1 e2 =>
+  --     subst e1; subst e2
+  --     cases j; case _ j1 j2 =>
+  --     apply SNi.neu j1
+  --   case red t t' j1 j2 ih1 ih2 =>
+  --     intro u x e
+  --     cases t <;> simp at e
+  --     case _ v w =>
+  --     cases e; case _ e1 e2 =>
+  --     subst e1; subst e2
+  --     cases j1
+  --     case beta A b j1 =>
+  --       let r : Ren := x :: id
+  --       have lem : b[.su (.var x) :: +0] = b[r] := by
+  --         subst r; rw [ren_subst_apply_eq]
+  --         intro i y h
+  --         cases i <;> simp at *
+  --         case zero => exact h
+  --         case _ z => exact h
+  --       rw [lem] at j2
+  --       apply SNi.lam
+  --       apply @antirename .nor (b[r]) r j2
+  --       rfl
+  --     case step s' j1 =>
+  --       replace ih2 := ih2 s' x rfl
+  --       apply SNi.red j1 ih2
 
-  @[simp]
-  abbrev SnPropertyWeakenLemmaType : (v : SnVariant) -> (i : SnIndices v) -> Prop
-  | .neu, s => Neutral s
-  | .nor, _ => True
-  | .red, (s, t) => s ~> t
+  -- @[simp]
+  -- abbrev SnPropertyWeakenLemmaType : (v : SnVariant) -> (i : SnIndices v) -> Prop
+  -- | .neu, s => Neutral s
+  -- | .nor, _ => True
+  -- | .red, (s, t) => s ~> t
 
-  theorem property_weaken {v i} : SNi v i -> SnPropertyWeakenLemmaType v i := by
-    intro h
-    induction h <;> simp at *
-    case _ => apply Neutral.var
-    case _ ih _ => apply Neutral.app ih
-    case _ => apply Red.beta
-    case _ ih => apply Red.app1 ih
+  -- theorem property_weaken {v i} : SNi v i -> SnPropertyWeakenLemmaType v i := by
+  --   intro h
+  --   induction h <;> simp at *
+  --   case _ => apply Neutral.var
+  --   case _ ih _ => apply Neutral.app ih
+  --   case _ => apply Red.beta
+  --   case _ ih => apply Red.app1 ih
 
-  @[simp]
-  abbrev SnSoundLemmaType : (v : SnVariant) -> (i : SnIndices v) -> Prop
-  | .neu, s => SN Red s
-  | .nor, s => SN Red s
-  | .red, (s, t) => s ~>sn t
+  -- @[simp]
+  -- abbrev SnSoundLemmaType : (v : SnVariant) -> (i : SnIndices v) -> Prop
+  -- | .neu, s => SN Red s
+  -- | .nor, s => SN Red s
+  -- | .red, (s, t) => s ~>sn t
 
-  theorem sound {v i} : SNi v i -> SnSoundLemmaType v i := by
-    intro h; induction h <;> simp at *
-    case _ => apply SN.sn; intro y r; cases r
-    case _ s t j1 j2 ih1 ih2 =>
-      have lem := property_weaken j1; simp at lem
-      apply SN.neutral_app lem ih1 ih2
-    case _ t A j ih => apply SN.lam.1 ih
-    case _ t j ih => apply ih
-    case _ ih1 ih2 => apply SN.backward_closure ih2 ih1
-    case _ ih => apply SnHeadRed.beta ih
-    case _ ih => apply SnHeadRed.app _ ih
+  -- theorem sound {v i} : SNi v i -> SnSoundLemmaType v i := by
+  --   intro h; induction h <;> simp at *
+  --   case _ => apply SN.sn; intro y r; cases r
+  --   case _ s t j1 j2 ih1 ih2 =>
+  --     have lem := property_weaken j1; simp at lem
+  --     apply SN.neutral_app lem ih1 ih2
+  --   case _ t A j ih => apply SN.lam.1 ih
+  --   case _ t j ih => apply ih
+  --   case _ ih1 ih2 => apply SN.backward_closure ih2 ih1
+  --   case _ ih => apply SnHeadRed.beta ih
+  --   case _ ih => apply SnHeadRed.app _ ih
 
-  -- TODO: prove completeness
+  -- -- TODO: prove completeness
   -- theorem complete {t} : (SN Red t -> SNi .nor t) ∧ (∀ t', t ~>sn t' -> SNi .red (t, t')) := by
   --   induction t
   --   case _ x =>

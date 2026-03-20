@@ -142,6 +142,7 @@ instance SubstMapCompose_Term : SubstMapCompose Term Term where
 inductive Neutral : Term -> Prop where
 | var : Neutral #x
 | app : Neutral f -> Neutral (f :@ a)
+| nrec : Neutral n -> Neutral (.nrec A z s n)
 
 theorem to_ren_is_var {t : Term} {r : Ren} : t = Term.from_action (r.to x) -> ∃ y, t = #y := by
   intro h
