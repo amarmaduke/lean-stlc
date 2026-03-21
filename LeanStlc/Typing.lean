@@ -43,6 +43,10 @@ theorem TypingRen.lift {Γ Δ : List Ty} A {r : Ren} : Γ -⟨r⟩> Δ -> A::Γ 
   exact j; case _ x =>
   apply h j
 
+theorem TypingRen.id : X -⟨id⟩> X := by sorry
+
+theorem TypingRen.succ : X -⟨(· + 1)⟩> A::X := by sorry
+
 theorem TypingRen.comp : X -⟨r1⟩> Y -> Y -⟨r2⟩> Z -> X -⟨r2 ∘ r1⟩> Z := by sorry
 
 infixr:90 " ∘ "  => TypingRen.comp

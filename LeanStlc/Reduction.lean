@@ -5,6 +5,7 @@ import LeanStlc.Term
 
 open LeanSubst
 
+@[grind]
 inductive Red : Term -> Term -> Prop where
 | beta {A b t} : Red ((:λ[A] b) :@ t) (b[.su t::+0])
 | app1 {f f' a} : Red f f' -> Red (f :@ a) (f' :@ a)

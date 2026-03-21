@@ -172,6 +172,7 @@ namespace SN
 end SN
 
 mutual
+  @[grind]
   inductive SnNor : Term -> Prop
   | lam : SnNor t -> SnNor (:λ[A] t)
   | zero : SnNor .zero
@@ -179,11 +180,13 @@ mutual
   | neu : SnNeu t -> SnNor t
   | red : SnRed t t' -> SnNor t' -> SnNor t
 
+  @[grind]
   inductive SnNeu : Term -> Prop
   | var : SnNeu #x
   | app : SnNeu s -> SnNor t -> SnNeu (s :@ t)
   | nrec : SnNor z -> SnNor s -> SnNeu t -> SnNeu (.nrec A z s t)
 
+  @[grind]
   inductive SnRed : Term -> Term -> Prop
   | beta : SnNor t -> SnRed ((:λ[A] b) :@ t) b[su t::+0]
   | zero : SnRed (.nrec A z s .zero) z
@@ -294,6 +297,15 @@ mutual
   def SnNeu.sound : SnNeu t -> SN Red t := sorry
 
   def SnRed.sound : SnRed t t' -> t ~>sn t' := sorry
+end
+
+mutual
+  def SnRed.expansion (j : Γ ⊢ t' : A) : SnRed t t' -> Γ ⊢ t : A
+  | .beta t => sorry
+  | .zero => sorry
+  | .succ => sorry
+  | .step_app r => sorry
+  | .step_nrec r => sorry
 end
 
 namespace SNi
