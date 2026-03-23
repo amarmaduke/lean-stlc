@@ -94,6 +94,8 @@ namespace SN
       subst zdef
       apply ih (:λ[A] y) (Red.lam r) rfl
 
+  theorem succ : SN Red t <-> SN Red t.succ := by sorry
+
   theorem neutral_app {f a} : Neutral f -> SN Red f -> SN Red a -> SN Red (f :@ a) := by
     intro h1 h2 h3
     induction h2 generalizing a
@@ -109,6 +111,27 @@ namespace SN
         apply ih2 f' r lem1 lem2
       case _ a' r =>
         apply ih3 a' r
+
+  theorem neutral_nrec :
+    Neutral n ->
+    SN Red z ->
+    SN Red s ->
+    SN Red n ->
+    SN Red (Term.nrec A z s n)
+  := by
+    intro nh j1 j2 j3
+    induction j3 generalizing z s; case _ n h1 ih1 =>
+    induction j2 generalizing z; case _ s h2 ih2 =>
+    induction j1; case _ z h3 ih3 =>
+    apply SN.sn; case _ =>
+    intro y r; cases r
+    case nrec_zero => cases nh
+    case nrec_succ => cases nh
+    case nrec1 z' r => apply ih3 _ r
+    case nrec2 s' r => apply ih2 _ r (.sn h3)
+    case nrec3 n' r =>
+      apply ih1 _ r _ (.sn h3) (.sn h2)
+      apply Red.preservation_of_neutral_step nh r
 
   theorem weak_head_expansion {t b A}
     : SN Red t -> SN Red (b[.su t::+0]) -> SN Red ((:λ[A] b) :@ t)
@@ -195,54 +218,6 @@ mutual
   | step_nrec : SnRed n n' -> SnRed (.nrec A z s n) (.nrec A z s n')
 end
 
-inductive SnVariant where
-| neu | nor | red
-
-@[simp]
-abbrev SnIndices : SnVariant -> Type
-| .neu => Term
-| .nor => Term
-| .red => (Term) × (Term)
-
-inductive SNi : (v : SnVariant) -> SnIndices v -> Prop where
-| var {x} : SNi .neu (.var x)
-| app {s t} :
-  SNi .neu s ->
-  SNi .nor t ->
-  SNi .neu (s :@ t)
-| lam {t A} :
-  SNi .nor t ->
-  SNi .nor (:λ[A] t)
-| zero : SNi .nor .zero
-| succ :
-  SNi .nor t ->
-  SNi .nor t.succ
-| nrec :
-  SNi .neu t ->
-  SNi .nor z ->
-  SNi .nor s ->
-  SNi .neu (.nrec A z s t)
-| neu {t} :
-  SNi .neu t ->
-  SNi .nor t
-| red {t t'} :
-  SNi .red (t, t') ->
-  SNi .nor t' ->
-  SNi .nor t
-| beta {t A b} :
-  SNi .nor t ->
-  SNi .red ((:λ[A] b) :@ t, b[.su t :: +0])
-| nrec_zero :
-  SNi .red (.nrec A z s .zero, z)
-| nrec_succ :
-  SNi .red (.nrec A z s t.succ, s :@ (.nrec A z s t))
-| step_nrec :
-  SNi .red (t, t') ->
-  SNi .red (.nrec A z s t, .nrec A z s t')
-| step_app {s s' t} :
-  SNi .red (s, s') ->
-  SNi .red (s :@ t, s' :@ t)
-
 mutual
   def SnNor.rename (r : Ren) : SnNor t -> SnNor t[r]
   | @SnNor.lam t _ th =>
@@ -279,33 +254,71 @@ mutual
   def SnRed.antirename (r : Ren) : SnRed t t' -> ∀ z, t = z[r] -> ∃ z', t' = z'[r] ∧ SnRed z z' := sorry
 end
 
+def SnNeu.beta_var : SnNeu s -> s = t :@ .var x -> SnNeu t
+| .app f a, e => by grind
+
+theorem SnNor.beta_var : ∀ {s}, SnNor s -> ∀ {t x}, s = t :@ .var x -> SnNor t := by
+  intro s sn
+  apply SnNor.brecOn
+    (motive_1 := λ s sn => ∀ {t x}, s = t :@ .var x -> SnNor t)
+    (motive_2 := λ _ _ => True)
+    (motive_3 := λ _ _ _ => True)
+    sn
+  case _ =>
+    intro s sn ih t x e
+    cases ih; all_goals try solve | injection e
+    case neu sn _ =>
+      apply SnNor.neu
+      apply SnNeu.beta_var sn e
+    case red t' t'n _ t'nb ih r rb =>
+      subst e; cases rb
+      case beta b _ _ ih2 =>
+        apply SnNor.lam
+        let r : Ren := x :: id
+        have lem : b[.su #x :: +0] = b[r] := by
+          subst r; rw [ren_subst_apply_eq]
+          intro i y h
+          cases i <;> simp at *
+          case zero => exact h
+          case _ z => exact h
+        rw [lem] at t'n
+        apply SnNor.antirename r t'n b rfl
+      case step_app s' _ r rb =>
+        apply SnNor.red r
+        apply ih rfl
+  all_goals simp
+
+def SnNeu.weaken : SnNeu t -> Neutral t
+| .var => .var
+| .app f a => .app f.weaken
+| .nrec _ _ n => .nrec n.weaken
+
+def SnRed.weaken : SnRed t t' -> t ~> t'
+| .beta t => .beta
+| .zero => .nrec_zero
+| .succ => .nrec_succ
+| .step_app r => .app1 r.weaken
+| .step_nrec r => .nrec3 r.weaken
+
 mutual
-  def SnNor.beta_var : SnNor s -> ∀ t x, s = t :@ .var x -> SnNor t := sorry
+  def SnNor.sound : SnNor t -> SN Red t
+  | .lam h => SN.lam.1 h.sound
+  | .zero => SN.sn (by grind)
+  | .succ h => SN.succ.1 h.sound
+  | .neu h => h.sound
+  | .red r h => SN.backward_closure h.sound r.sound
 
-  def SnNeu.beta_var : SnNeu s -> ∀ t x, s = t :@ .var x -> SnNeu t := sorry
-end
+  def SnNeu.sound : SnNeu t -> SN Red t
+  | .var => SN.sn (by grind)
+  | .app s t => SN.neutral_app s.weaken s.sound t.sound
+  | .nrec z s n => SN.neutral_nrec n.weaken z.sound s.sound n.sound
 
-mutual
-  def SnNeu.weaken : SnNeu t -> Neutral t := sorry
-
-  def SnRed.weaken : SnRed t t' -> t ~> t' := sorry
-end
-
-mutual
-  def SnNor.sound : SnNor t -> SN Red t := sorry
-
-  def SnNeu.sound : SnNeu t -> SN Red t := sorry
-
-  def SnRed.sound : SnRed t t' -> t ~>sn t' := sorry
-end
-
-mutual
-  def SnRed.expansion (j : Γ ⊢ t' : A) : SnRed t t' -> Γ ⊢ t : A
-  | .beta t => sorry
-  | .zero => sorry
-  | .succ => sorry
-  | .step_app r => sorry
-  | .step_nrec r => sorry
+  def SnRed.sound : SnRed t t' -> t ~>sn t'
+  | .beta h => .beta h.sound
+  | .zero => .zero
+  | .succ => .succ
+  | .step_app h => .app _ h.sound
+  | .step_nrec h => .nrec h.sound
 end
 
 namespace SNi
@@ -382,112 +395,4 @@ namespace SNi
   --       exists (z' :@ v); simp [*]
   --       apply SNi.step (h'.2)
 
-  -- @[simp]
-  -- abbrev SnBetaVarLemmaType : (v : SnVariant) -> (i : SnIndices v) -> Prop
-  -- | .neu, s => ∀ t x, s = t :@ .var x -> SNi .neu t
-  -- | .nor, s => ∀ t x, s = t :@ .var x -> SNi .nor t
-  -- | .red, _ => True
-
-  -- theorem beta_var {v i} : SNi v i -> SnBetaVarLemmaType v i := by
-  --   intro j; induction j <;> simp at *
-  --   case app s t j1 j2 ih1 ih2 =>
-  --     intro u x e1 e2; subst e1; subst e2
-  --     apply j1
-  --   case neu t j ih =>
-  --     intro u x e
-  --     cases t <;> simp at e
-  --     case _ v w =>
-  --     cases e; case _ e1 e2 =>
-  --     subst e1; subst e2
-  --     cases j; case _ j1 j2 =>
-  --     apply SNi.neu j1
-  --   case red t t' j1 j2 ih1 ih2 =>
-  --     intro u x e
-  --     cases t <;> simp at e
-  --     case _ v w =>
-  --     cases e; case _ e1 e2 =>
-  --     subst e1; subst e2
-  --     cases j1
-  --     case beta A b j1 =>
-  --       let r : Ren := x :: id
-  --       have lem : b[.su (.var x) :: +0] = b[r] := by
-  --         subst r; rw [ren_subst_apply_eq]
-  --         intro i y h
-  --         cases i <;> simp at *
-  --         case zero => exact h
-  --         case _ z => exact h
-  --       rw [lem] at j2
-  --       apply SNi.lam
-  --       apply @antirename .nor (b[r]) r j2
-  --       rfl
-  --     case step s' j1 =>
-  --       replace ih2 := ih2 s' x rfl
-  --       apply SNi.red j1 ih2
-
-  -- @[simp]
-  -- abbrev SnPropertyWeakenLemmaType : (v : SnVariant) -> (i : SnIndices v) -> Prop
-  -- | .neu, s => Neutral s
-  -- | .nor, _ => True
-  -- | .red, (s, t) => s ~> t
-
-  -- theorem property_weaken {v i} : SNi v i -> SnPropertyWeakenLemmaType v i := by
-  --   intro h
-  --   induction h <;> simp at *
-  --   case _ => apply Neutral.var
-  --   case _ ih _ => apply Neutral.app ih
-  --   case _ => apply Red.beta
-  --   case _ ih => apply Red.app1 ih
-
-  -- @[simp]
-  -- abbrev SnSoundLemmaType : (v : SnVariant) -> (i : SnIndices v) -> Prop
-  -- | .neu, s => SN Red s
-  -- | .nor, s => SN Red s
-  -- | .red, (s, t) => s ~>sn t
-
-  -- theorem sound {v i} : SNi v i -> SnSoundLemmaType v i := by
-  --   intro h; induction h <;> simp at *
-  --   case _ => apply SN.sn; intro y r; cases r
-  --   case _ s t j1 j2 ih1 ih2 =>
-  --     have lem := property_weaken j1; simp at lem
-  --     apply SN.neutral_app lem ih1 ih2
-  --   case _ t A j ih => apply SN.lam.1 ih
-  --   case _ t j ih => apply ih
-  --   case _ ih1 ih2 => apply SN.backward_closure ih2 ih1
-  --   case _ ih => apply SnHeadRed.beta ih
-  --   case _ ih => apply SnHeadRed.app _ ih
-
-  -- -- TODO: prove completeness
-  -- theorem complete {t} : (SN Red t -> SNi .nor t) ∧ (∀ t', t ~>sn t' -> SNi .red (t, t')) := by
-  --   induction t
-  --   case _ x =>
-  --     apply And.intro
-  --     intro h; apply SNi.neu (SNi.var)
-  --     intro t' h; cases h
-  --   case _ f a ih1 ih2 =>
-  --     apply And.intro
-  --     case _ =>
-  --       intro h
-  --       have lem1 := sn_subterm_app h
-  --       have lem2 := ih1.1 lem1.1
-  --       cases lem2
-  --       case _ j =>
-  --         sorry
-  --       case _ h => apply SNi.neu (SNi.app h (ih2.1 lem1.2))
-  --       case _ t' j1 j2 =>
-  --         have lem : SNi .red (f :@ a, t' :@ a) := by sorry
-  --         apply SNi.red lem
-  --         sorry
-  --     case _ =>
-  --       intro t' r; cases r
-  --       case _ A b h =>
-  --         apply SNi.beta
-  --         apply ih2.1 h
-  --       case _ f' r =>
-  --         apply SNi.step
-  --         apply ih1.2 f' r
-  --   case _ A t ih =>
-  --     apply And.intro
-  --     intro h; apply SNi.lam
-  --     apply ih.1 (sn_lam.2 h)
-  --     intro t' r; cases r
 end SNi
