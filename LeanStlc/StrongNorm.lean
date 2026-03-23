@@ -114,7 +114,7 @@ namespace StrongNormalizaton
   | .lam t => by cases j
   | .zero =>
     let j' := (Typing.nrec (LR.typing h1) (LR.typing h2) j)
-    cr.2.2 j' SnRed.zero h1
+    cr.2.2 j' (SnRed.zero (cr.1 h2)) h1
   | .succ t =>
     let j' := (Typing.nrec (LR.typing h1) (LR.typing h2) j)
     cr.2.2 j' SnRed.succ (app h2 (nrec h1 h2 (by cases j; grind) t))

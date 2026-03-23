@@ -7,57 +7,44 @@ open LeanSubst
 
 inductive SnHeadRed : Term -> Term -> Prop where
 | beta {t A b} : SN Red t -> SnHeadRed ((:λ[A] b) :@ t) (b[.su t::+0])
-| zero : SnHeadRed (.nrec A z s .zero) z
+| zero : SN Red s -> SnHeadRed (.nrec A z s .zero) z
 | succ : SnHeadRed (.nrec A z s (.succ n)) (s :@ (.nrec A z s n))
 | nrec : SnHeadRed n n' -> SnHeadRed (.nrec A z s n) (.nrec A z s n')
 | app {f f'} a : SnHeadRed f f' -> SnHeadRed (f :@ a) (f' :@ a)
 
 infix:80 " ~>sn " => SnHeadRed
 
-namespace SnHeadRed
-  theorem red_compatible {t a b} : t ~>sn a -> t ~> b -> a = b ∨ ∃ z, b ~>sn z ∧ a ~>* z := by
-    sorry
-    -- intro r1 r2
-    -- induction r1 generalizing b
-    -- case _ t' A b' h =>
-    --   cases r2
-    --   case _ => apply Or.inl rfl
-    --   case _ f' r =>
-    --     cases r; case _ b'' r =>
-    --     apply Or.inr; exists (b''[.su t' :: +0])
-    --     apply And.intro
-    --     apply SnHeadRed.beta h
-    --     apply Star.subst; apply Star.step Star.refl r
-    --   case _ t'' r =>
-    --     apply Or.inr; exists (b'[.su t'' :: +0])
-    --     apply And.intro
-    --     apply SnHeadRed.beta
-    --     apply SN.preservation_step h r
-    --     apply Red.subst_arg
-    --     intro x; cases x <;> simp
-    --     case _ => apply ActionRed.su r
-    --     case _ => apply ActionRed.re
-    -- case _ f f' a r1 ih =>
-    --   cases r2
-    --   case _ => cases r1
-    --   case _ f'' r2 =>
-    --     replace ih := ih r2
-    --     cases ih
-    --     case _ ih =>
-    --       subst ih; apply Or.inl rfl
-    --     case _ ih =>
-    --       cases ih; case _ z ih =>
-    --       have lem1 := SnHeadRed.app a ih.1
-    --       apply Or.inr
-    --       exists (z :@ a); apply And.intro lem1
-    --       apply Star.congr2_1 a Term.app Red.app1 ih.2
-    --   case _ a'' r2 =>
-    --     apply Or.inr
-    --     exists (f' :@ a''); apply And.intro
-    --     apply SnHeadRed.app a'' r1
-    --     apply Star.congr2_2 f' Term.app Red.app2
-    --     apply Star.step Star.refl r2
-end SnHeadRed
+def SnHeadRed.red_compatible {t a b} : t ~>sn a -> t ~> b -> a = b ∨ ∃ z, b ~>sn z ∧ a ~>* z
+| .beta t, .beta => .inl rfl
+| .beta tn, .app1 (.lam r) => .inr ⟨_, .beta tn, .subst _ (.step .refl r)⟩
+| .beta (t := t) tn, .app2 (a' := a) r =>
+  let h : ∀ (x : Nat), ActionRed Red ((su t :: +0) x) ((su a :: +0) x)
+    | 0 => .su r
+    | x + 1 => .re
+  .inr ⟨_, .beta (.preservation_step tn r), Red.subst_arg h⟩
+| .zero _, .nrec_zero => .inl rfl
+| .zero sn, .nrec1 r => .inr ⟨_, .zero sn, .step .refl r⟩
+| .zero sn, .nrec2 r => .inr ⟨_, .zero (sn.preservation_step r), .refl⟩
+| .succ, .nrec_succ => .inl rfl
+| .succ, .nrec1 r => .inr ⟨_, .succ, .step .refl (.app2 $ .nrec1 r)⟩
+| .succ, .nrec2 r =>
+  let r1 := Star.step .refl r
+  let r2 := Star.step .refl (.nrec2 r)
+  .inr ⟨_, .succ, .congr2 Term.app .app1 .app2 r1 r2⟩
+| .succ, .nrec3 (.succ r) => .inr ⟨_, .succ, .step .refl (.app2 $ .nrec3 r)⟩
+| .nrec r, .nrec1 r2 => .inr ⟨_, .nrec r, .step .refl $ .nrec1 r2⟩
+| .nrec r, .nrec2 r2 => .inr ⟨_, .nrec r, .step .refl $ .nrec2 r2⟩
+| .nrec r, .nrec3 r2 =>
+  match red_compatible r r2 with
+  | .inl ih => .inl (by grind)
+  | .inr ⟨z, ih1, ih2⟩ => .inr ⟨_, .nrec ih1, .congr3_3 _ _ (.nrec _) .nrec3 ih2⟩
+| .app a r, .app1 r2 =>
+  match red_compatible r r2 with
+  | .inl ih => .inl (by grind)
+  | .inr ⟨z, ih1, ih2⟩ =>
+    .inr ⟨z :@ a, .app a ih1, .congr2_1 a .app .app1 ih2⟩
+| .app (f' := f') a r, .app2 (a' := a') r2 =>
+  .inr ⟨f' :@ a', .app a' r, .congr2_2 f' .app .app2 (.step .refl r2)⟩
 
 namespace SN
   theorem subterm_app {f a} : SN Red (f :@ a) -> SN Red f ∧ SN Red a := by
@@ -77,6 +64,23 @@ namespace SN
       replace ih := ih (f :@ y) (Red.app2 r) rfl
       apply ih.2
 
+  theorem subterm_nrec : SN Red (.nrec A z s n) -> SN Red z ∧ SN Red s ∧ SN Red n := by
+    intro j; generalize wdef : Term.nrec A z s n = w at j
+    induction j generalizing z s n; case _ w h ih =>
+    subst wdef; apply And.intro _; apply And.intro
+    case _ =>
+      apply SN.sn; intro s' r
+      replace ih := ih (.nrec A z s' n) (Red.nrec2 r) rfl
+      apply ih.2.1
+    case _ =>
+      apply SN.sn; intro n' r
+      replace ih := ih (.nrec A z s n') (Red.nrec3 r) rfl
+      apply ih.2.2
+    case _ =>
+      apply SN.sn; intro z' r
+      replace ih := ih (.nrec A z' s n) (Red.nrec1 r) rfl
+      apply ih.1
+
   theorem lam {t A} : SN Red t <-> SN Red (:λ[A] t) := by
     apply Iff.intro
     case _ =>
@@ -94,7 +98,22 @@ namespace SN
       subst zdef
       apply ih (:λ[A] y) (Red.lam r) rfl
 
-  theorem succ : SN Red t <-> SN Red t.succ := by sorry
+  theorem succ : SN Red t <-> SN Red t.succ := by
+    apply Iff.intro
+    case _ =>
+      intro h; induction h
+      case _ t h ih =>
+      apply SN.sn; intro y r
+      cases r; case _ t' r =>
+      apply ih _ r
+    case _ =>
+      intro h
+      generalize zdef : t.succ = z at *
+      induction h generalizing t
+      case _ x h ih =>
+      apply SN.sn; intro y r
+      subst zdef
+      apply ih y.succ (Red.succ r) rfl
 
   theorem neutral_app {f a} : Neutral f -> SN Red f -> SN Red a -> SN Red (f :@ a) := by
     intro h1 h2 h3
@@ -160,7 +179,48 @@ namespace SN
       have lem3 := SN.preservation lem1 lem2
       apply ih1 t' r lem3
 
-  theorem red_app_preservation {f f' a}
+  theorem zero_expansion : SN Red s -> SN Red z -> SN Red (.nrec A z s .zero) := by
+    intro h1 h2
+    induction h2 generalizing s; case _ z hz ihz =>
+    induction h1; case _ s hs ihs =>
+    apply SN.sn; case _ =>
+    intro y r; cases r
+    case nrec_zero => apply SN.sn hz
+    case nrec1 z' r =>
+      apply ihz _ r
+      apply SN.sn hs
+    case nrec2 s' r => apply ihs _ r
+    case nrec3 n' r => cases r
+
+  theorem succ_expansion : SN Red (s :@ .nrec A z s n) -> SN Red z -> SN Red s -> SN Red n -> SN Red (.nrec A z s n.succ) := by
+    intro h j1 j2 j3
+    induction j3 generalizing z s; case _ n j3 ih3 =>
+    induction j2 generalizing z; case _ s j2 ih2 =>
+    induction j1; case _ z j1 ih1 =>
+    apply SN.sn; case _ =>
+    intro y r; cases r
+    case nrec_succ n => exact h
+    case nrec1 z' r =>
+      apply ih1 _ r
+      apply SN.preservation_step h
+      apply Red.app2
+      apply Red.nrec1 r
+    case nrec2 s' r =>
+      apply ih2 _ r
+      apply SN.preservation h
+      apply Star.congr2 Term.app Red.app1 Red.app2
+      apply Star.step .refl r
+      apply Star.step .refl
+      apply Red.nrec2 r
+      apply SN.sn j1
+    case nrec3 n' r =>
+      cases r; case _ n' r =>
+      apply ih3 _ r _ (SN.sn j1) (SN.sn j2)
+      apply SN.preservation_step h
+      apply Red.app2
+      apply Red.nrec3 r
+
+  theorem backward_closure_app {f f' a}
     : f ~>sn f' -> SN Red f -> SN Red a -> SN Red (f' :@ a) -> SN Red (f :@ a)
   := by
     intro r1 h1 h2 h3
@@ -185,13 +245,49 @@ namespace SN
       apply SN.preservation h3
       apply Star.congr2_2 f' Term.app Red.app2 (Star.step Star.refl r)
 
+  theorem backward_closure_nrec
+    : n ~>sn n' -> SN Red z -> SN Red s -> SN Red n -> SN Red (.nrec A z s n') -> SN Red (.nrec A z s n)
+  := by
+    intro r1 h1 h2 h3 h4
+    induction h3 generalizing z s n'; case _ n hn ihn =>
+    induction h2 generalizing z; case _ s hs ihs =>
+    induction h1; case _ z hz ihz =>
+    apply SN.sn; intro y r2; case _ =>
+    cases r2
+    case nrec_zero => cases r1
+    case nrec_succ => cases r1
+    case nrec1 z' r =>
+      apply ihz z' r
+      apply SN.preservation_step h4
+      apply Red.nrec1 r
+    case nrec2 s' r =>
+      apply ihs s' r (SN.sn hz)
+      apply SN.preservation_step h4
+      apply Red.nrec2 r
+    case nrec3 n'' r =>
+      have lem1 := SnHeadRed.red_compatible r1 r
+      cases lem1
+      case _ lem1 => subst lem1; exact h4
+      case _ lem1 =>
+        obtain ⟨w, lem1, lem2⟩ := lem1
+        apply ihn n'' r lem1 (SN.sn hz) (SN.sn hs)
+        apply SN.preservation h4
+        apply Star.congr3_3 _ _ (Term.nrec _) Red.nrec3 lem2
+
   theorem backward_closure {t' t} : SN Red t' -> t ~>sn t' -> SN Red t := by
-    sorry
-    -- intro h r; induction r
-    -- case _ h2 => apply weak_head_expansion h2 h
-    -- case _ r ih =>
-    --   have lem := subterm_app h
-    --   apply red_app_preservation r (ih lem.1) lem.2 h
+    intro h r; induction r
+    case beta h2 => apply weak_head_expansion h2 h
+    case app r ih =>
+      have lem := subterm_app h
+      apply backward_closure_app r (ih lem.1) lem.2 h
+    case zero h2 => apply zero_expansion h2 h
+    case succ =>
+      obtain ⟨h1, h2⟩ := subterm_app h
+      obtain ⟨h3, h4, h5⟩ := subterm_nrec h2
+      apply succ_expansion h h3 h4 h5
+    case nrec r ih =>
+      obtain ⟨h1, h2, h3⟩ := subterm_nrec h
+      apply backward_closure_nrec r h1 h2 (ih h3) h
 end SN
 
 mutual
@@ -212,7 +308,7 @@ mutual
   @[grind]
   inductive SnRed : Term -> Term -> Prop
   | beta : SnNor t -> SnRed ((:λ[A] b) :@ t) b[su t::+0]
-  | zero : SnRed (.nrec A z s .zero) z
+  | zero : SnNor s -> SnRed (.nrec A z s .zero) z
   | succ : SnRed (.nrec A z s t.succ) (s :@ (.nrec A z s t))
   | step_app : SnRed s s' -> SnRed (s :@ t) (s' :@ t)
   | step_nrec : SnRed n n' -> SnRed (.nrec A z s n) (.nrec A z s n')
@@ -226,32 +322,78 @@ mutual
       exact .rename r.lift th
     SnNor.lam lem
   | .zero => .zero
-  | .succ t => .succ (.rename r t)
-  | .neu t => .neu (.rename r t)
-  | .red h t' => .red (.rename r h) (.rename r t')
+  | .succ t => .succ (t.rename r)
+  | .neu t => .neu (t.rename r)
+  | .red h t' => .red (h.rename r) (t'.rename r)
 
   def SnNeu.rename (r : Ren) : SnNeu t -> SnNeu t[r]
   | .var => .var
-  | .app s t => .app (.rename r s) (.rename r t)
-  | .nrec t z s => .nrec (.rename r t) (.rename r z) (.rename r s)
+  | .app s t => .app (s.rename r) (t.rename r)
+  | .nrec t z s => .nrec (t.rename r) (z.rename r) (s.rename r)
 
   def SnRed.rename (r : Ren) : SnRed t t' -> SnRed t[r] t'[r]
   | @SnRed.beta t A b th => by {
     have lem := @SnRed.beta (t[r]) A (b[.re 0 :: r ∘ +1]) (.rename r th)
     simp at lem; simp; exact lem
   }
-  | .zero => .zero
+  | .zero h => .zero (h.rename r)
   | .succ => .succ
-  | .step_app h => .step_app (.rename r h)
-  | .step_nrec h => .step_nrec (.rename r h)
+  | .step_app h => .step_app (h.rename r)
+  | .step_nrec h => .step_nrec (h.rename r)
 end
 
 mutual
-  def SnNor.antirename (r : Ren) : SnNor t -> ∀ z, t = z[r] -> SnNor z := sorry
+  def SnNor.antirename (r : Ren) : SnNor t -> ∀ z, t = z[r] -> SnNor z
+  | @SnNor.lam t A tn, :λ[A'] t', e =>
+    have ⟨e1, e2⟩ : A = A' ∧ t = t'[r.lift] := by grind
+    have tn' := tn.antirename r.lift _ e2
+    .lam tn'
+  | .zero, .zero, e => .zero
+  | @SnNor.succ t tn, (.succ t'), e =>
+    have e : t = t'[r] := by grind
+    .succ (tn.antirename r _ e)
+  | .neu t, z, e => .neu (t.antirename r _ e)
+  | .red h t', z, e =>
+    let ⟨w, e, h'⟩ := h.antirename r _ e
+    let t'' := SnNor.antirename r t' _ e
+    .red h' t''
 
-  def SnNeu.antirename (r : Ren) : SnNeu t -> ∀ z, t = z[r] -> SnNeu z := sorry
+  def SnNeu.antirename (r : Ren) : SnNeu t -> ∀ z, t = z[r] -> SnNeu z
+  | .var, #z, e => .var
+  | @SnNeu.app s t sn tn, f :@ a, e =>
+    let ⟨e1, e2⟩ : s = f[r] ∧ t = a[r] := by grind
+    let sn' := sn.antirename r _ e1
+    let tn' := tn.antirename r _ e2
+    .app sn' tn'
+  | @SnNeu.nrec z s n A zn sn nn, .nrec A' z' s' n', e =>
+    let ⟨e1, e2, e3, e4⟩: A = A' ∧ z = z'[r] ∧ s = s'[r] ∧ n = n'[r] := by grind
+    let zn' := zn.antirename r _ e2
+    let sn' := sn.antirename r _ e3
+    let nn' := nn.antirename r _ e4
+    .nrec zn' sn' nn'
 
-  def SnRed.antirename (r : Ren) : SnRed t t' -> ∀ z, t = z[r] -> ∃ z', t' = z'[r] ∧ SnRed z z' := sorry
+  -- this beta case is REALLY crazy (subst breaks termination checks)
+  def SnRed.antirename (r : Ren) : SnRed t t' -> ∀ z, t = z[r] -> ∃ z', t' = z'[r] ∧ SnRed z z'
+  | .beta (t := t) (b := b) tn, .app (.lam A b') t', e =>
+    let ⟨e1, e2⟩ : t = t'[r] ∧ b = b'[re 0::r ∘ +1] := by grind
+    let tn' := tn.antirename r _ e1
+    -- ⟨b'[su t'::+0], (by subst e1 e2; simp), .beta tn'⟩
+    ⟨b'[su t'::+0], (by rw [e1, e2]; simp), .beta tn'⟩
+  | @SnRed.zero s A z h, .nrec A' z' s' .zero, e =>
+    let ⟨e1, e2, e3⟩: A = A' ∧ z = z'[r] ∧ s = s'[r] := by grind
+    let h' := h.antirename r _ e3
+    ⟨z', e2, .zero h'⟩
+  | @SnRed.succ A z s n, .nrec A' z' s' (.succ n'), e =>
+    let ⟨e1, e2, e3, e4⟩: A = A' ∧ z = z'[r] ∧ s = s'[r] ∧ n = n'[r] := by grind
+    ⟨s' :@ .nrec A' z' s' n', (by grind), .succ⟩
+  | @SnRed.step_app s s' t h, f :@ a, e =>
+    let ⟨e1, e2⟩ : s = f[r] ∧ t = a[r] := by grind
+    have ⟨z, e, h2⟩ := h.antirename r _ e1
+    ⟨z :@ a, (by grind), .step_app h2⟩
+  | @SnRed.step_nrec n n' A z s h, .nrec A' z' s' n'', e =>
+    let ⟨e1, e2, e3, e4⟩ : A = A' ∧ z = z'[r] ∧ s = s'[r] ∧ n = n''[r] := by grind
+    have ⟨w, e, h2⟩ := h.antirename r _ e4
+    ⟨.nrec A' z' s' w, (by grind), .step_nrec h2⟩
 end
 
 def SnNeu.beta_var : SnNeu s -> s = t :@ .var x -> SnNeu t
@@ -295,7 +437,7 @@ def SnNeu.weaken : SnNeu t -> Neutral t
 
 def SnRed.weaken : SnRed t t' -> t ~> t'
 | .beta t => .beta
-| .zero => .nrec_zero
+| .zero _ => .nrec_zero
 | .succ => .nrec_succ
 | .step_app r => .app1 r.weaken
 | .step_nrec r => .nrec3 r.weaken
@@ -315,84 +457,8 @@ mutual
 
   def SnRed.sound : SnRed t t' -> t ~>sn t'
   | .beta h => .beta h.sound
-  | .zero => .zero
+  | .zero h => .zero h.sound
   | .succ => .succ
   | .step_app h => .app _ h.sound
   | .step_nrec h => .nrec h.sound
 end
-
-namespace SNi
-
-  -- @[simp]
-  -- abbrev SnAntiRenameLemmaType (r : Ren) : (v : SnVariant) -> (i : SnIndices v) -> Prop
-  -- | .neu, t => ∀ z, t = z[r] -> SNi .neu z
-  -- | .nor, t => ∀ z, t = z[r] -> SNi .nor z
-  -- | .red, (t, t') =>
-  --   ∀ z, t = z[r] ->
-  --   ∃ z', t' = z'[r] ∧ SNi .red (z, z')
-
-  -- theorem antirename {v i} r : SNi v i -> SnAntiRenameLemmaType r v i := by
-  --   intro j; induction j generalizing r <;> simp at *
-  --   case var x =>
-  --     intro z h
-  --     cases z <;> simp at h
-  --     case _ y => apply SNi.var
-  --   case app s t j1 j2 ih1 ih2 =>
-  --     intro z h1; cases z <;> simp at h1
-  --     case _ x => apply SNi.var
-  --     case _ u v => apply SNi.app (ih1 r _ h1.1) (ih2 r _ h1.2)
-  --   case lam t A j ih =>
-  --     intro z h
-  --     cases z <;> simp at h
-  --     case _ x => apply SNi.neu; apply SNi.var
-  --     case _ A' b =>
-  --       cases h; case _ h1 h2 =>
-  --       subst h1; apply SNi.lam
-  --       replace ih := ih (r.lift) b
-  --       rw [Ren.to_lift] at ih
-  --       simp at ih; apply ih h2
-  --   case neu t j ih =>
-  --     intro z h2
-  --     replace ih := ih r z h2
-  --     apply SNi.neu ih
-  --   case red t t' j1 j2 ih1 ih2 =>
-  --     intro z h2
-  --     have lem := ih1 r _ h2
-  --     cases lem; case _ z' h2 =>
-  --     apply SNi.red h2.2
-  --     apply ih2 r _ h2.1
-  --   case beta t A b j ih =>
-  --     intro z h2
-  --     cases z <;> simp at h2
-  --     case _ x =>
-  --       have lem := to_ren_is_var h2
-  --       cases lem; case _ y lem =>
-  --       injection lem
-  --     case _ u v =>
-  --       cases u <;> simp at h2
-  --       case _ x =>
-  --         have lem := to_ren_is_var h2.1
-  --         cases lem; case _ y lem =>
-  --         injection lem
-  --       case _ A' u =>
-  --         cases h2; case _ h1 h2 =>
-  --         cases h1; case _ h1 h3 =>
-  --         subst h1
-  --         replace ih := ih r _ h2
-  --         subst h2; subst h3; simp at *
-  --         exists (u[.su v :: +0]); simp
-  --         apply SNi.beta ih
-  --   case step s s' t j ih =>
-  --     intro z h2
-  --     cases z <;> simp at h2
-  --     case _ x =>
-  --       have lem := to_ren_is_var h2
-  --       cases lem; case _ y lem =>
-  --       injection lem
-  --     case _ u v =>
-  --       replace ih := ih r _ h2.1
-  --       cases ih; case _ z' h' =>
-  --       exists (z' :@ v); simp [*]
-  --       apply SNi.step (h'.2)
-
-end SNi
