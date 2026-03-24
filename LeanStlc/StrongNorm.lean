@@ -17,7 +17,7 @@ namespace StrongNormalizaton
 
   @[simp]
   def GR : List Ty -> List Ty -> (Subst Term -> Prop)
-  | Γ, Δ, σ => ∀ x T, Γ[x]? = .some T -> LR Δ T ↑(σ x)
+  | Γ, Δ, σ => ∀ {x T}, Γ[x]? = .some T -> LR Δ T ↑(σ x)
 
   @[simp]
   def SemanticTyping Γ t A := ∀ σ Δ, GR Γ Δ σ -> LR Δ A (t[σ])
@@ -43,7 +43,7 @@ namespace StrongNormalizaton
 
   theorem GR.forget : GR Γ Δ σ -> Γ -[σ]> Δ := by
     intro h1 x T h2
-    replace h1 := h1 x T h2
+    replace h1 := h1 h2
     apply LR.typing h1
 
   theorem cr :
@@ -90,24 +90,19 @@ namespace StrongNormalizaton
   theorem LR.var {A x} : Γ ⊢ #x : A -> LR Γ A #x := by
     intro j; apply cr.2.1 j; apply SnNeu.var
 
-  theorem LR.nrec_neutral :
-    LR Γ A z ->
-    LR Γ (A -t> A) s ->
-    Γ ⊢ n : Ty.nat ->
-    SnNeu n ->
-    LR Γ A (.nrec A z s n)
-  := by
-    intro h1 h2 h3 h4
-    have lem1 := cr.1 h1
-    have lem2 := cr.1 h2
-    have lem3 := Typing.nrec (LR.typing h1) (LR.typing h2) h3
-    apply cr.2.1 lem3
-    apply SnNeu.nrec lem1 lem2 h4
+  theorem LR.nrec_neutral
+    (h1 : LR Γ A z)
+    (h2 : LR Γ (A -t> A) s)
+    (h3 : Γ ⊢ n : Ty.nat)
+    (h4 : SnNeu n)
+    : LR Γ A (.nrec A z s n)
+  :=
+    let lem := Typing.nrec (LR.typing h1) (LR.typing h2) h3
+    cr.2.1 lem (SnNeu.nrec (cr.1 h1) (cr.1 h2) h4)
 
-  theorem LR.app (flr : LR Γ (A -t> B) f) (alr : LR Γ A a) : LR Γ B (f :@ a) := by
-    simp at flr
-    have lem := flr.2 TypingRen.id alr; simp at lem
-    apply lem
+  theorem LR.app (flr : LR Γ (A -t> B) f) (alr : LR Γ A a) : LR Γ B (f :@ a) :=
+    let lem := flr.2 TypingRen.id alr
+    by simp at lem; exact lem
 
   def LR.nrec (h1 : LR Γ A z) (h2 : LR Γ (A -t> A) s) (j : Γ ⊢ n : Ty.nat)
     : SnNor n -> LR Γ A (.nrec A z s n)
@@ -124,79 +119,107 @@ namespace StrongNormalizaton
     let r' := SnRed.weaken r
     cr.2.2 j' (SnRed.step_nrec r) (LR.nrec h1 h2 (j.preservation_step r') t')
 
-  theorem fundamental {Γ t A} : Γ ⊢ t : A -> Γ ⊨s t : A := by
-    intro j; induction j
-    case var Γ T x j =>
-      simp; intro σ Δ h
-      apply h x T j
-    case app Γ A B f a j1 j2 ih1 ih2 =>
-      simp; intro σ Δ h; simp at ih1
-      replace ih2 := ih2 σ Δ h
-      replace ih1 := (ih1 σ Δ h).2 TypingRen.id ih2
-      simp at ih1; apply ih1
-    case lam Γ A B t j ih =>
-      simp; intro σ Δ h; apply And.intro
-      apply Typing.lam
-      have lem : Γ -[σ]> Δ := GR.forget h
-      replace lem : A::Γ -[σ.lift]> A::Δ := TypingSubst.lift A lem
-      simp at lem; apply Typing.subst lem j
-      intro r Δ' v m lv
-      have lem : t[.re 0::σ ∘ r ∘ +1][.su v :: +0] = t[.su v::σ ∘ r.to] := by simp
-      apply @cr.2.2 _ _ (t[.su v::σ ∘ r.to])
-      apply Typing.app _ (LR.typing lv); apply Typing.lam
-      have lem3 := Typing.subst (TypingSubst.lift _ (GR.forget h)) j
-      replace lem3 := Typing.rename (TypingRen.lift _ m) lem3
-      rw [Ren.to_lift] at lem3; simp at lem3; apply lem3
-      have lem2 := @SnRed.beta v A (t[.re 0::σ ∘ r ∘ +1]); simp at lem2
-      apply lem2
-      apply cr.1 lv
-      replace ih := ih (.su v :: σ ∘ r.to) Δ'
-      apply ih
-      simp; intro x T j2
-      cases x
-      case _ =>
-        simp; simp at j2; subst j2
-        apply lv
-      case _ x =>
-        simp; simp at j2
-        replace h := h x T j2
-        unfold Subst.compose; simp
-        generalize zdef : σ x = z at *
-        cases z <;> simp at *
-        case _ k =>
-          have lem := LR.monotone m h; simp at lem
-          generalize wdef : r k = w at *
-          cases w <;> simp [*]
-        case _ t => apply LR.monotone m h
-    case zero =>
-      intro σ Δ h; simp
-      apply And.intro; apply Typing.zero
-      apply SnNor.zero
-    case succ Γ n j ih =>
-      intro σ Δ h; simp
-      replace ih := ih σ Δ h; simp at ih
-      apply And.intro
-      apply Typing.succ ih.1
-      apply SnNor.succ ih.2
-    case nrec Γ z A s n j1 j2 j3 ih1 ih2 ih3 =>
-      intro σ Δ h; simp
-      replace ih1 := ih1 σ Δ h
-      replace ih2 := ih2 σ Δ h
-      replace ih3 := ih3 σ Δ h
-      have lem2 := Typing.subst (GR.forget h) j3
-      apply LR.nrec ih1 ih2 lem2
-      apply cr.1 ih3
+  def fundamental : Γ ⊢ t : A -> Γ ⊨s t : A
+  | .var j, σ, Δ, h => h j
+  | .app fj aj, σ, Δ, h =>
+    let aj' := fundamental aj σ Δ h
+    let fj' := (fundamental fj σ Δ h).2 TypingRen.id aj'
+    by simp at fj'; exact fj'
+  | @Typing.lam _ A B t tj, σ, Δ, h =>
+    let m1 : Γ -[σ]> Δ := h.forget
+    let lem1 := .subst m1 (.lam tj)
+    let lem2 {r Δ' v} (m2 : Δ -⟨r⟩> Δ') (lv : LR Δ' A v) : LR Δ' B ((:λ[A] t)[σ][r] :@ v) :=
+      let tj' := fundamental tj (.su v::σ ∘ r.to) Δ' (by {
+        intro x T h2; cases x <;> simp at *
+        subst h2; exact lv
+        have lem := LR.monotone m2 (h h2)
+        simp at lem; exact lem
+      })
+      let lem2 := @SnRed.beta v A (t[.re 0::σ ∘ r ∘ +1]) (cr.1 lv)
+      @cr.2.2 _ _ (t[.su v::σ ∘ r.to])
+        (.app (.rename m2 lem1) (LR.typing lv))
+        (by simp at lem2; simp; exact lem2)
+        tj'
+    ⟨lem1, lem2⟩
+  | .zero, σ, Δ, h => ⟨.zero, .zero⟩
+  | .succ nj, σ, Δ, h =>
+    let ⟨ih1, ih2⟩ := fundamental nj σ Δ h
+    ⟨ih1.succ, ih2.succ⟩
+  | .nrec zj sj nj, σ, Δ, h =>
+    let ⟨ih1, ih2⟩ := fundamental nj σ Δ h
+    LR.nrec (fundamental zj σ Δ h) (fundamental sj σ Δ h) ih1 ih2
+
+  -- theorem fundamental2 {Γ t A} : Γ ⊢ t : A -> Γ ⊨s t : A := by
+  --   intro j; induction j
+  --   case var Γ T x j =>
+  --     simp; intro σ Δ h
+  --     apply h j
+  --   case app Γ A B f a j1 j2 ih1 ih2 =>
+  --     simp; intro σ Δ h; simp at ih1
+  --     replace ih2 := ih2 σ Δ h
+  --     replace ih1 := (ih1 σ Δ h).2 TypingRen.id ih2
+  --     simp at ih1; apply ih1
+  --   case lam Γ A B t j ih =>
+  --     simp; intro σ Δ h; apply And.intro
+  --     apply Typing.lam
+  --     have lem : Γ -[σ]> Δ := GR.forget h
+  --     replace lem : A::Γ -[σ.lift]> A::Δ := TypingSubst.lift A lem
+  --     simp at lem; apply Typing.subst lem j
+  --     intro r Δ' v m lv
+  --     have lem : t[.re 0::σ ∘ r ∘ +1][.su v :: +0] = t[.su v::σ ∘ r.to] := by simp
+  --     apply @cr.2.2 _ _ (t[.su v::σ ∘ r.to])
+  --     apply Typing.app _ (LR.typing lv); apply Typing.lam
+  --     have lem3 := Typing.subst (TypingSubst.lift _ (GR.forget h)) j
+  --     replace lem3 := Typing.rename (TypingRen.lift _ m) lem3
+  --     rw [Ren.to_lift] at lem3; simp at lem3; apply lem3
+  --     have lem2 := @SnRed.beta v A (t[.re 0::σ ∘ r ∘ +1]); simp at lem2
+  --     apply lem2
+  --     apply cr.1 lv
+  --     replace ih := ih (.su v :: σ ∘ r.to) Δ'
+  --     apply ih
+  --     simp; intro x T j2
+  --     cases x
+  --     case _ =>
+  --       simp; simp at j2; subst j2
+  --       apply lv
+  --     case _ x =>
+  --       simp; simp at j2
+  --       replace h := h j2
+  --       unfold Subst.compose; simp
+  --       generalize zdef : σ x = z at *
+  --       cases z <;> simp at *
+  --       case _ k =>
+  --         have lem := LR.monotone m h; simp at lem
+  --         generalize wdef : r k = w at *
+  --         cases w <;> simp [*]
+  --       case _ t => apply LR.monotone m h
+  --   case zero =>
+  --     intro σ Δ h; simp
+  --     apply And.intro; apply Typing.zero
+  --     apply SnNor.zero
+  --   case succ Γ n j ih =>
+  --     intro σ Δ h; simp
+  --     replace ih := ih σ Δ h; simp at ih
+  --     apply And.intro
+  --     apply Typing.succ ih.1
+  --     apply SnNor.succ ih.2
+  --   case nrec Γ z A s n j1 j2 j3 ih1 ih2 ih3 =>
+  --     intro σ Δ h; simp
+  --     replace ih1 := ih1 σ Δ h
+  --     replace ih2 := ih2 σ Δ h
+  --     replace ih3 := ih3 σ Δ h
+  --     have lem2 := Typing.subst (GR.forget h) j3
+  --     apply LR.nrec ih1 ih2 lem2
+  --     apply cr.1 ih3
 end StrongNormalizaton
 
-theorem strong_normalization_inductive {Γ t A} : Γ ⊢ t : A -> SnNor t := by
-  intro j
-  have lem1 : StrongNormalizaton.GR Γ Γ +0 := by
+theorem strong_normalization_inductive (j : Γ ⊢ t : A) : SnNor t :=
+  let lem1 : StrongNormalizaton.GR Γ Γ +0 := by
     simp; intro x T h
     apply StrongNormalizaton.LR.var
     apply Typing.var h
-  have lem2 := StrongNormalizaton.fundamental j +0 Γ lem1; simp at lem2
-  apply StrongNormalizaton.cr.1 lem2
+  let lem2 := StrongNormalizaton.fundamental j +0 Γ lem1
+  StrongNormalizaton.cr.1 (by simp at lem2; exact lem2)
 
-theorem strong_normalization {Γ t A} : Γ ⊢ t : A -> SN Red t := by
-  intro j; apply SnNor.sound
-  apply strong_normalization_inductive j
+theorem strong_normalization (j : Γ ⊢ t : A) : SN Red t :=
+  SnNor.sound $ strong_normalization_inductive j

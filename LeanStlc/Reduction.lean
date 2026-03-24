@@ -524,16 +524,12 @@ namespace Red
   instance : HasConfluence Red where
     confluence := confluence
 
-  theorem preservation_of_neutral_step : Neutral t -> t ~> t' -> Neutral t' := by
-    sorry
-    -- intro h r
-    -- induction h generalizing t'
-    -- case _ => cases r
-    -- case _ f a h ih =>
-    --   cases r
-    --   case _ => cases h
-    --   case _ f' r => apply Neutral.app (ih r)
-    --   case _ a' r => apply Neutral.app h
+  theorem preservation_of_neutral_step : Neutral t -> t ~> t' -> Neutral t'
+  | .app fn, .app1 r => .app (preservation_of_neutral_step fn r)
+  | .app fn, .app2 r => .app fn
+  | .nrec nn, .nrec1 r => .nrec nn
+  | .nrec nn, .nrec2 r => .nrec nn
+  | .nrec nn, .nrec3 r => .nrec (preservation_of_neutral_step nn r)
 
   theorem preservation_of_neutral : Neutral t -> t ~>* t' -> Neutral t' := by
     intro h r

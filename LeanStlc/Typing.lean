@@ -33,23 +33,31 @@ abbrev TypingRen (r : Ren) (Γ Δ : List Ty) := ∀ {x T}, Γ[x]? = some T -> Δ
 
 notation:35 Γ:35 " -⟨" r "⟩> " Δ:35 => TypingRen r Γ Δ
 
-abbrev TypingSubst (σ : Subst Term) (Γ Δ : List Ty) := ∀ {x T}, Γ[x]? = some T -> Δ ⊢ σ x : T
-
-notation:35 Γ:35 " -[" σ "]> " Δ:35 => TypingSubst σ Γ Δ
-
 theorem TypingRen.lift {Γ Δ : List Ty} A {r : Ren} : Γ -⟨r⟩> Δ -> A::Γ -⟨r.lift⟩> A::Δ := by
   intro h x T j
   cases x <;> simp [Ren.lift] at *
   exact j; case _ x =>
   apply h j
 
-theorem TypingRen.id : X -⟨id⟩> X := by sorry
+theorem TypingRen.id : X -⟨id⟩> X := by
+  intro x T h; exact h
 
-theorem TypingRen.succ : X -⟨(· + 1)⟩> A::X := by sorry
+theorem TypingRen.succ : X -⟨(· + 1)⟩> A::X := by
+  intro x T h; exact h
 
-theorem TypingRen.comp : X -⟨r1⟩> Y -> Y -⟨r2⟩> Z -> X -⟨r2 ∘ r1⟩> Z := by sorry
+theorem TypingRen.comp : X -⟨r1⟩> Y -> Y -⟨r2⟩> Z -> X -⟨r2 ∘ r1⟩> Z := by
+  intro j1 j2 x T h; simp
+  apply j2 (j1 h)
 
 infixr:90 " ∘ "  => TypingRen.comp
+
+abbrev TypingSubst (σ : Subst Term) (Γ Δ : List Ty) := ∀ {x T}, Γ[x]? = some T -> Δ ⊢ σ x : T
+
+notation:35 Γ:35 " -[" σ "]> " Δ:35 => TypingSubst σ Γ Δ
+
+theorem TypingSubst.succ : X -[+1]> A::X := by
+  intro x T h; simp
+  apply Typing.var; exact h
 
 def Typing.rename (m : Γ -⟨r⟩> Δ) : Γ ⊢ t : A -> Δ ⊢ t[r] : A
 | @var Γ T x h => var (m h)
@@ -95,30 +103,16 @@ theorem Typing.rename_old {Γ t A} Δ (r : Ren) :
     case _ =>
       apply ih3; intro x T j1; apply h; apply j1
 
-theorem TypingSubst.lift {Γ Δ : List Ty} A {σ : Subst Term} : Γ -[σ]> Δ -> A::Γ -[σ.lift]> A::Δ := by
-  sorry
-
--- theorem typing_subst_lift {Γ Δ} A {σ : Subst Term} :
---   (∀ x T, Γ ⊢ #x : T -> Δ ⊢ σ x : T) ->
---   ∀ x T, (A::Γ) ⊢ #x : T -> (A::Δ) ⊢ σ.lift x : T
--- := by
---   intro h x T j
---   cases j; case _ j =>
---   cases x <;> simp at *
---   case _ => subst j; apply Typing.var; simp
---   case _ x =>
---     have h' := h _ _ (Typing.var j)
---     have lem := typing_weaken (A :: Δ) (λ x => x + 1) h' (by {
---       intro x T j2; simp
---       apply Typing.var; simp
---       cases j2; simp [*]
---     }); simp at lem
---     unfold Subst.compose; simp
---     generalize zdef : σ x = z at *
---     cases z <;> simp at *
---     all_goals
---       simp [Term.from_action, Subst.compose] at lem
---       rw [zdef] at lem; simp at lem; apply lem
+theorem TypingSubst.lift {Γ Δ : List Ty} A {σ : Subst Term} :
+  Γ -[σ]> Δ ->
+  A::Γ -[σ.lift]> A::Δ
+:= by
+  intro j x T h
+  cases x <;> simp at *
+  case _ => apply Typing.var; simp [h]
+  case _ x =>
+    have lem := Typing.rename (Δ := A::Δ) TypingRen.succ (j h)
+    simp at lem; exact lem
 
 def Typing.subst (m : Γ -[σ]> Δ) : Γ ⊢ t : A -> Δ ⊢ t[σ] : A
 | var h => m h
