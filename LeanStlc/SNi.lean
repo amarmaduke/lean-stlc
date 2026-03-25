@@ -6,6 +6,14 @@ import LeanStlc.SN
 
 open LeanSubst
 
+-- Raamsdonk's Characterization of SN terms
+-- 1. Raamsdonk argues *all* SN proofs require the fundamental lemma of perpetuality (hidden or not)
+-- 2. The fundamental lemma says:
+--    for t ∈ SN, b[ t ] t₁ ⋯ tₙ ∈ SN `implies` (λ b) t t₁ ⋯ tₙ ∈ SN
+--    (the converse being:)
+--    for t ∈ SN, if (λ b) t t₁ ⋯ tₙ weakly diverges `implies` b[ t ] t₁ ⋯ tₙ weakly diverges
+--    where "weakly diverges" means there is some reduction strategy the diverges
+-- 3. This inductive characterization bakes in a perpetual reduction strategy, trivializing the fundamental lemma
 mutual
   @[grind]
   inductive SnNor : Term -> Prop
@@ -88,13 +96,12 @@ mutual
     let nn' := nn.antirename r _ e4
     .nrec zn' sn' nn'
 
-  -- this beta case is REALLY crazy (subst breaks termination checks)
+  -- do beta case for everyone
   def SnRed.antirename (r : Ren) : SnRed t t' -> ∀ z, t = z[r] -> ∃ z', t' = z'[r] ∧ SnRed z z'
   | .beta (t := t) (b := b) tn, .app (.lam A b') t', e =>
     let ⟨e1, e2⟩ : t = t'[r] ∧ b = b'[re 0::r ∘ +1] := by grind
     let tn' := tn.antirename r _ e1
-    -- ⟨b'[su t'::+0], (by subst e1 e2; simp), .beta tn'⟩
-    ⟨b'[su t'::+0], (by rw [e1, e2]; simp), .beta tn'⟩
+    ⟨b'[su t'::+0], (by simp [e1, e2]), .beta tn'⟩
   | @SnRed.zero s A z h, .nrec A' z' s' .zero, e =>
     let ⟨e1, e2, e3⟩: A = A' ∧ z = z'[r] ∧ s = s'[r] := by grind
     let h' := h.antirename r _ e3

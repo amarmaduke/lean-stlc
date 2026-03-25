@@ -59,6 +59,22 @@ theorem TypingSubst.succ : X -[+1]> A::X := by
   intro x T h; simp
   apply Typing.var; exact h
 
+def TypingSubst.re (j : Δ[y]? = some A) (m : Γ -[σ]> Δ) : A::Γ -[re y::σ]> Δ
+| 0, T, h => .var $ cast (by simp at h; rw [h]) $ j
+| x + 1, T, h => m h
+
+def TypingSubst.su (j : Δ ⊢ a : A) (m : Γ -[σ]> Δ) : A::Γ -[su a::σ]> Δ
+| 0, T, h => cast (by simp; grind) $ j
+| x + 1, T, h => m h
+
+def TypingSubst.forget (m : X -[r.to]> Y) : X -⟨r⟩> Y
+| _, _, h =>
+  match m h with
+  | .var h => h
+
+def TypingRen.to (m : X -⟨r⟩> Y) : X -[r.to]> Y
+| _, _, h => .var (m h)
+
 def Typing.rename (m : Γ -⟨r⟩> Δ) : Γ ⊢ t : A -> Δ ⊢ t[r] : A
 | @var Γ T x h => var (m h)
 | app f a => app (f.rename m) (a.rename m)

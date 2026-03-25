@@ -1,6 +1,8 @@
 
 import LeanSubst
 
+open LeanSubst
+
 inductive Ty : Type where
 | base : Ty
 | arrow : Ty -> Ty -> Ty
@@ -39,13 +41,9 @@ protected def Term.repr (a : Term) (p : Nat) : Std.Format :=
 instance : Repr Term where
   reprPrec := Term.repr
 
-open LeanSubst
-
 prefix:max "#" => Term.var
 infixl:65 " :@ " => Term.app
 notation ":λ[" A "] " t => Term.lam A t
-
-open LeanSubst
 
 @[coe]
 def Term.from_action : Subst.Action Term -> Term
