@@ -359,97 +359,98 @@ end ℒ
 namespace ℛ
 
   theorem lam : ℛ ⟦A -t> B⟧ (:λ[C] b) <-> ∀ (r:Ren) a, ℰ A a -> ℰ B b[su a::r] := by
-    apply Iff.intro
-    case _ =>
-      intro h1 r a h2
-      simp only [ℛ] at h1
-      simp only [ℰ] at *
-      apply ℒ.lift
-      case _ =>
-        intro h3
-        simp at h1
-        simp only [ℛ]
-        intro r'
-        simp
-        replace h1 := h1 (r) a h2
-        simp at h1
-        cases h1
-        case _ h4 h5 h6 =>
-          replace h4 := h4 h3
-          simp only [ℛ] at h4
-          replace h4 := h4 r'
-          simp at h4; apply h4
-      case _ =>
-        intro h3
-        simp at h1
-        replace h1 := h1 (r) a h2
-        simp at h1
-        cases h1
-        case _ j1 j2 j3 =>
-          replace j2 := j2 h3; apply j2
-      case _ =>
-        intro t' h3
-        apply ℒ.lift
-        case _ =>
-          intro h4
-          simp only [ℛ]
-          intro r'
-          simp at h1
-          replace h1 := h1 r a h2
-          cases h1
-          case _ h5 h6 =>
-            replace h6 := @h6 t' h3
-            cases h6
-            case _ h6 h7 h8 h9 =>
-              replace h7 := h7 h4
-              simp only [ℛ] at h7
-              apply h7
-        case _ =>
-          intro h4
-          simp at h1
-          replace h1 := h1 r a h2
-          cases h1
-          case _ j1 j2 j3 =>
-            replace j3 := @j3 t' h3
-            cases j3
-            case _ w1 w2 w3 =>
-              apply w2 h4
-        case _ =>
-          intro t'' h4
-          simp at h1
-          replace h1 := h1 r a h2
-          cases h1
-          case _ h5 h6 =>
-            replace h6 := @h6 t' h3
-            cases h6
-            case _ h6 h7 =>
-              replace h7 := @h7 t'' h4; apply h7
-    case _ =>
-      intro h1
-      simp only [ℛ]
-      intro r
-      simp
-      intro a h2
-      apply ℒ.lift
-      case _ =>
-        intro h3
-        simp only [ℰ] at h1
-        replace h1 := h1 r a h2
-        cases h1
-        case _ h4 h5 h6 => apply h4; apply h3
-      case _ =>
-        intro h3
-        replace h1 := h1 r a h2
-        simp only [ℰ] at h1
-        cases h1
-        case _ j1 j2 j3 =>
-          apply j2 h3
-      case _ =>
-        intro t h3
-        replace h1 := h1 r a h2
-        cases h1
-        case _ h4 h5 =>
-          apply h5; apply h3
+    sorry
+    -- apply Iff.intro
+    -- case _ =>
+    --   intro h1 r a h2
+    --   simp only [ℛ] at h1
+    --   simp only [ℰ] at *
+    --   apply ℒ.lift
+    --   case _ =>
+    --     intro h3
+    --     simp at h1
+    --     simp only [ℛ]
+    --     intro r'
+    --     simp
+    --     replace h1 := h1 (r) a h2
+    --     simp at h1
+    --     cases h1
+    --     case _ h4 h5 h6 =>
+    --       replace h4 := h4 h3
+    --       simp only [ℛ] at h4
+    --       replace h4 := h4 r'
+    --       simp at h4; apply h4
+    --   case _ =>
+    --     intro h3
+    --     simp at h1
+    --     replace h1 := h1 (r) a h2
+    --     simp at h1
+    --     cases h1
+    --     case _ j1 j2 j3 =>
+    --       replace j2 := j2 h3; apply j2
+    --   case _ =>
+    --     intro t' h3
+    --     apply ℒ.lift
+    --     case _ =>
+    --       intro h4
+    --       simp only [ℛ]
+    --       intro r'
+    --       simp at h1
+    --       replace h1 := h1 r a h2
+    --       cases h1
+    --       case _ h5 h6 =>
+    --         replace h6 := @h6 t' h3
+    --         cases h6
+    --         case _ h6 h7 h8 h9 =>
+    --           replace h7 := h7 h4
+    --           simp only [ℛ] at h7
+    --           apply h7
+    --     case _ =>
+    --       intro h4
+    --       simp at h1
+    --       replace h1 := h1 r a h2
+    --       cases h1
+    --       case _ j1 j2 j3 =>
+    --         replace j3 := @j3 t' h3
+    --         cases j3
+    --         case _ w1 w2 w3 =>
+    --           apply w2 h4
+    --     case _ =>
+    --       intro t'' h4
+    --       simp at h1
+    --       replace h1 := h1 r a h2
+    --       cases h1
+    --       case _ h5 h6 =>
+    --         replace h6 := @h6 t' h3
+    --         cases h6
+    --         case _ h6 h7 =>
+    --           replace h7 := @h7 t'' h4; apply h7
+    -- case _ =>
+    --   intro h1
+    --   simp only [ℛ]
+    --   intro r
+    --   simp
+    --   intro a h2
+    --   apply ℒ.lift
+    --   case _ =>
+    --     intro h3
+    --     simp only [ℰ] at h1
+    --     replace h1 := h1 r a h2
+    --     cases h1
+    --     case _ h4 h5 h6 => apply h4; apply h3
+    --   case _ =>
+    --     intro h3
+    --     replace h1 := h1 r a h2
+    --     simp only [ℰ] at h1
+    --     cases h1
+    --     case _ j1 j2 j3 =>
+    --       apply j2 h3
+    --   case _ =>
+    --     intro t h3
+    --     replace h1 := h1 r a h2
+    --     cases h1
+    --     case _ h4 h5 =>
+    --       apply h5; apply h3
 
 end ℛ
 

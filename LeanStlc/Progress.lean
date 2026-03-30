@@ -7,8 +7,25 @@ open LeanSubst
 namespace Term
   @[simp]
   def is_lam : Term -> Bool
-  | .lam _ _ => true
+  | lam _ _ => true
   | _ => false
+
+  @[simp]
+  def destruct_lam : Term -> Option (Ty × Term)
+  | lam A t => some (A, t)
+  | _ => none
+
+  @[simp]
+  def is_nat : Term -> Bool
+  | zero => true
+  | succ _ => true
+  | _ => false
+
+  @[simp]
+  def destruct_nat : Term -> Option (Term ⊕ Unit)
+  | zero => some (.inr ())
+  | succ n => some (.inl n)
+  | _ => none
 end Term
 
 inductive Value : Term -> Prop where
@@ -16,32 +33,28 @@ inductive Value : Term -> Prop where
 | app :
   Value f ->
   Value a ->
-  ¬ f.is_lam ->
+  f.destruct_lam = none ->
   Value (f :@ a)
 | lam :
   Value t ->
   Value (:λ[A] t)
+| nrec :
+  Value z ->
+  Value s ->
+  Value n ->
+  n.destruct_nat = none ->
+  Value (.nrec A z s n)
 | zero : Value Term.zero
 | succ : Value n -> Value (Term.succ n)
 
-theorem value_sound : Value t -> ∀ t', ¬ (t ~> t') := by
-  intro j t' r
-  induction j generalizing t'
-  case var => cases r
-  case app j1 j2 j3 ih1 ih2 =>
-    cases r
-    case beta => simp at j3
-    case app1 r => apply ih1 _ r
-    case app2 r => apply ih2 _ r
-  case lam j ih =>
-    cases r; case _ r =>
-    apply ih _ r
-  case zero =>
-    cases r
-  case succ n h ih =>
-    cases r
-    case _ n' j1 =>
-      apply ih n' j1
+def Value.sound : Value t -> ∀ t', ¬ (t ~> t')
+| app f _ _, _, .app1 r => sound f _ r
+| app _ a _, _, .app2 r => sound a _ r
+| lam t, _, .lam r => sound t _ r
+| nrec z _ _ _, _, .nrec1 r => sound z _ r
+| nrec _ s _ _, _, .nrec2 r => sound s _ r
+| nrec _ _ n _, _, .nrec3 r => sound n _ r
+| succ n, _, .succ r => sound n _ r
 
 inductive VarSpine : Term -> Prop where
 | var : VarSpine #x
@@ -78,12 +91,40 @@ theorem lam_value :
     cases j; case _ j =>
     apply Or.inl; apply Exists.intro _; rfl
   case _ =>
-
     sorry
   case _ =>
     sorry
+  all_goals sorry
 
-theorem progress t : Value t ∨ (∃ t', t ~> t') := by sorry
+def Term.is_lam_value : t.is_lam -> ∃ A b, t = :λ[A] b := by
+  induction t <;> simp [is_lam]
+
+def Term.progress : (t : Term) -> Value t ∨ (∃ t', t ~> t')
+| var x => .inl .var
+| app f a =>
+  match h : f.destruct_lam, progress f, progress a with
+  | some (A, b), _, _ => .inr ⟨b[su a::+0], by simp at h; grind⟩
+  | none, .inl fv, .inl av => .inl (.app fv av h)
+  | _, .inr ⟨f', r⟩, _ => .inr ⟨app f' a, .app1 r⟩
+  | _, _, .inr ⟨a', r⟩ => .inr ⟨app f a', .app2 r⟩
+| lam A t =>
+  match progress t with
+  | .inl tv => .inl (.lam tv)
+  | .inr ⟨t', r⟩ => .inr ⟨lam A t', .lam r⟩
+| zero => .inl .zero
+| succ n =>
+  match progress n with
+  | .inl nv => .inl (.succ nv)
+  | .inr ⟨n', r⟩ => .inr ⟨succ n', .succ r⟩
+| nrec A z s n =>
+  match h : n.destruct_nat, progress z, progress s, progress n with
+  | some (.inr ()), _, _, _ => .inr ⟨z, by simp at h; grind⟩
+  | some (.inl n), _, _, _ => .inr ⟨s :@ nrec A z s n, by simp at h; grind⟩
+  | none, .inl zv, .inl sv, .inl nv => .inl (.nrec zv sv nv h)
+  | _, .inr ⟨z', r⟩, _, _ => .inr ⟨nrec A z' s n, .nrec1 r⟩
+  | _, _, .inr ⟨s', r⟩, _ => .inr ⟨nrec A z s' n, .nrec2 r⟩
+  | _, _, _, .inr ⟨n', r⟩ => .inr ⟨nrec A z s n', .nrec3 r⟩
+
   -- induction t
   -- case var x => apply Or.inl; apply Value.var
   -- case app f a ih1 ih2 =>
