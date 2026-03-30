@@ -6,6 +6,14 @@ import LeanStlc.SN
 
 open LeanSubst
 
+def Set A := A -> Prop
+
+def Set.empty : Set A := λ _ => False
+
+def ℛ (S : Set Term) : Set Term
+| t => ∀ (r:Ren), S t[r]
+
+
 -- Raamsdonk's Characterization of SN terms
 -- 1. Raamsdonk argues *all* SN proofs require the fundamental lemma of perpetuality (hidden or not)
 -- 2. The fundamental lemma says:
@@ -16,26 +24,26 @@ open LeanSubst
 -- 3. This inductive characterization bakes in a perpetual reduction strategy, trivializing the fundamental lemma
 mutual
   @[grind]
-  inductive SnNor : Term -> Prop
-  | lam : SnNor t -> SnNor (:λ[A] t)
-  | zero : SnNor .zero
-  | succ : SnNor t -> SnNor t.succ
-  | neu : SnNeu t -> SnNor t
-  | red : SnRed t t' -> SnNor t' -> SnNor t
+  inductive SnNor : Set Term -> Term -> Prop
+  | lam : ℛ S (:λ[A] t) -> SnNor S t -> SnNor S (:λ[A] t)
+  | zero : SnNor S .zero
+  | succ : SnNor S t -> SnNor S t.succ
+  | neu : SnNeu S t -> SnNor S t
+  | red : SnRed S t t' -> SnNor S t' -> SnNor S t
 
   @[grind]
-  inductive SnNeu : Term -> Prop
-  | var : SnNeu #x
-  | app : SnNeu s -> SnNor t -> SnNeu (s :@ t)
-  | nrec : SnNor z -> SnNor s -> SnNeu t -> SnNeu (.nrec A z s t)
+  inductive SnNeu : Set Term -> Term -> Prop
+  | var : SnNeu S #x
+  | app : SnNeu S s -> SnNor S t -> SnNeu S (s :@ t)
+  | nrec : SnNor S z -> SnNor S s -> SnNeu S t -> SnNeu S (.nrec A z s t)
 
   @[grind]
-  inductive SnRed : Term -> Term -> Prop
-  | beta : SnNor t -> SnRed ((:λ[A] b) :@ t) b[su t::+0]
-  | zero : SnNor s -> SnRed (.nrec A z s .zero) z
-  | succ : SnRed (.nrec A z s t.succ) (s :@ (.nrec A z s t))
-  | step_app : SnRed s s' -> SnRed (s :@ t) (s' :@ t)
-  | step_nrec : SnRed n n' -> SnRed (.nrec A z s n) (.nrec A z s n')
+  inductive SnRed : Set Term -> Term -> Term -> Prop
+  | beta : SnNor S t -> SnRed S ((:λ[A] b) :@ t) b[su t::+0]
+  | zero : SnNor S s -> SnRed S (.nrec A z s .zero) z
+  | succ : SnRed S (.nrec A z s t.succ) (s :@ (.nrec A z s t))
+  | step_app : SnRed S s s' -> SnRed S (s :@ t) (s' :@ t)
+  | step_nrec : SnRed S n n' -> SnRed S (.nrec A z s n) (.nrec A z s n')
 end
 
 mutual
