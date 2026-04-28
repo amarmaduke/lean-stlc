@@ -47,25 +47,31 @@ mutual
 end
 
 mutual
-  def SnNor.rename (r : Ren) : SnNor t -> SnNor t[r]
-  | @SnNor.lam t _ th =>
-    let lem : SnNor t[r.to.lift] := by
+  def SnNor.rename (r : Ren) : SnNor S t -> SnNor S t[r]
+  | @SnNor.lam S A t f th =>
+    let lem : SnNor S t[r.to.lift] := by
       rw [<-Ren.to_lift]
       exact .rename r.lift th
-    SnNor.lam lem
+    let lem2 : ℛ S (:λ[A] t[r.to.lift]) := by
+      --rw [<-Ren.to_lift]
+      simp only [ℛ] at *
+      intro r'
+      simp at *
+      apply f
+    SnNor.lam lem2 lem
   | .zero => .zero
   | .succ t => .succ (t.rename r)
   | .neu t => .neu (t.rename r)
   | .red h t' => .red (h.rename r) (t'.rename r)
 
-  def SnNeu.rename (r : Ren) : SnNeu t -> SnNeu t[r]
+  def SnNeu.rename (r : Ren) : SnNeu S t -> SnNeu S t[r]
   | .var => .var
   | .app s t => .app (s.rename r) (t.rename r)
   | .nrec t z s => .nrec (t.rename r) (z.rename r) (s.rename r)
 
-  def SnRed.rename (r : Ren) : SnRed t t' -> SnRed t[r] t'[r]
-  | @SnRed.beta t A b th => by {
-    have lem := @SnRed.beta (t[r]) A (b[.re 0 :: r ∘ +1]) (.rename r th)
+  def SnRed.rename (r : Ren) : SnRed S t t' -> SnRed S t[r] t'[r]
+  | @SnRed.beta S t A b th => by {
+    have lem := @SnRed.beta S (t[r]) A (b[.re 0 :: r ∘ +1]) (.rename r th)
     simp at lem; simp; exact lem
   }
   | .zero h => .zero (h.rename r)
