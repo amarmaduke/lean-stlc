@@ -24,6 +24,8 @@ mutual
   | succ : SnNor Γ S t -> SnNor Γ S t.succ
   | neu : SnNeu Γ S t -> SnNor Γ S t
   | red : SnRed Γ S t t' -> SnNor Γ S t' -> SnNor Γ S t
+  | inl : SnNor S1 Γ t -> SnNor S2 Γ t.inl
+  | inr : SnNor S1 Γ t -> SnNor S2 Γ t.inr
 
   @[grind]
   inductive SnNeu : CtxSet -> CtxSet
@@ -57,6 +59,8 @@ mutual
   | .succ t => .succ (t.rename m)
   | .neu t => .neu (t.rename m)
   | .red h t' => .red (h.rename m) (t'.rename m)
+  | .inl t => .inl (t.rename m)
+  | .inr t => .inr (t.rename m)
 
   theorem SnNeu.rename (m : Γ -⟨r⟩> Δ) : SnNeu S Γ t -> SnNeu S Δ t[r]
   | .var => .var
@@ -80,6 +84,10 @@ def 𝒱 : Ty -> CtxSet
   λ Γ x => match x with
   | :λ[_] t => ∀ a, Γ ⊢ a : A -> SnNor (𝒱 A) Γ a -> (A :: Γ) ⊢ t : B -> SnNor (𝒱 B) Γ t[su a::+0]
   | _ => False
+| .plus A B => --unnecessary?
+  λ Γ x => match x with
+  | .inl t => (Γ ⊢ t : A ∧ SnNor (𝒱 A) Γ t) ∨ (Γ ⊢ t : B ∧ SnNor (𝒱 B) Γ t)
+  | _ => False
 | _ => CtxSet.empty
 
 def ℰ Γ A := λ t => Γ ⊢ t : A ∧ SnNor (𝒱 A) Γ t
@@ -97,11 +105,34 @@ local notation:170 Γ:170 " ⊨ " t:170 " : " A:170 => SemanticTyping Γ t A
 
 theorem SemSubst.forget (m : Γ -⟦σ⟧> Δ) : Γ -[σ]> Δ := .mk λ h => (m.act h).1
 
-theorem SemSubst.lift (m : Γ -⟦σ⟧> Δ) A : A::Γ -⟦σ.lift⟧> A::Δ := sorry
+theorem SemSubst.lift (m : Γ -⟦σ⟧> Δ) A : A::Γ -⟦σ.lift⟧> A::Δ := SemSubst.mk @λ i _ h =>
+  ⟨(TypingSubst.lift A (SemSubst.forget m)).act h, match i with
+   | 0 => SnNor.neu (SnNeu.var)
+   | _ + 1 => by {
+      simp_all
+      have ⟨e1, e2⟩ := m.act h
+      have ren : Δ -⟨(· + 1)⟩> (A :: Δ) := TypingRen.succ
+      have lem := SnNor.rename ren e2
+      simp at lem
+      apply lem
+    }⟩
 
-theorem SemSubst.compose (m1 : Γ -⟦σ⟧> Δ) (m2 : Δ -⟨r⟩> ξ) : Γ -⟦σ ∘ r.to⟧> ξ := sorry
+theorem SemSubst.compose (m1 : Γ -⟦σ⟧> Δ) (m2 : Δ -⟨r⟩> ξ) : Γ -⟦σ ∘ r.to⟧> ξ := SemSubst.mk @λ i _ h =>
+⟨(TypingSubst.comp (SemSubst.forget m1) (m2)).act h, by {
+  have ⟨e1, e2⟩ := m1.act h
+  have lem := SnNor.rename m2 e2
+  simp at lem
+  apply lem
+}⟩
 
-theorem SemSubst.su (j : ℰ Δ A a) (m : Γ -⟦σ⟧> Δ) : A::Γ -⟦su a::σ⟧> Δ := sorry
+theorem SemSubst.su (j : ℰ Δ A a) (m : Γ -⟦σ⟧> Δ) : A::Γ -⟦su a::σ⟧> Δ := SemSubst.mk @λ i _ h =>
+⟨(TypingSubst.su j.1 (SemSubst.forget m)).act h, match i with
+  | 0 => by simp at *; subst h; apply j.2
+  | _ + 1 => by {
+      simp_all
+      have ⟨e1, e2⟩ := m.act h
+      apply e2
+    }⟩
 
 theorem SnNor.appl : ∀ {A B a}, (S = 𝒱 (A -t> B)) -> Γ ⊢ a : (A -t> B) ->  SnNor S Γ a -> ℰ Γ A b -> ℰ Γ B (a :@ b)
 | A, B, :λ[_] t, eq, .lam j1, SnNor.lam h1 h2, ⟨j2, j3⟩ =>
@@ -126,13 +157,19 @@ theorem ℰ.nrec :
 | ⟨j1, j2⟩, ⟨j3, j4⟩, _, j5, .neu h1 => ⟨Typing.nrec j1 j3 j5, SnNor.neu (SnNeu.nrec j2 j4 h1)⟩
 | ⟨j1, j2⟩, ⟨j3, j4⟩, eq, j5, .red h1 h2 => ⟨Typing.nrec j1 j3 j5, SnNor.red (SnRed.step_nrec h1) (ℰ.nrec ⟨j1, j2⟩ ⟨j3,j4⟩ eq (SnRed.preservation j5 h1) h2).2⟩
 
+
 theorem fundamental : Γ ⊢ t : A -> Γ ⊨ t : A
 | .var xj, σ, Δ, h => h.act xj
 | .app fj aj, σ, Δ, h =>
   let fj' := fundamental fj h
   let aj' := fundamental aj h
   SnNor.appl rfl fj'.1 fj'.2 aj' |> cast (by simp)
-| .lam (A := A') (B := B) (t := t) tj, σ, Δ, h => sorry
+| .lam (A := A') (B := B) (t := t) tj, σ, Δ, h =>
+  let tj' : (A' :: Γ) ⊨ t : B := fundamental tj
+  have lem1 {Δ' r}: Δ -⟨r⟩> Δ' → 𝒱 (A' -t> B) Δ' (:λ[A'] t[σ.lift][r.to.lift]) := λ j a w1 w2 w3 =>
+    (tj' ((SemSubst.su (And.intro w1 w2)) (SemSubst.compose h j))).2 |> cast (by simp)
+  ⟨Typing.subst (SemSubst.forget h) (Typing.lam tj),
+   SnNor.lam (S2 := 𝒱 (B)) (t := t[σ.lift]) lem1 (tj' (SemSubst.lift h A')).2⟩
 | .zero, σ, Δ, h => ⟨Typing.zero, SnNor.zero⟩
 | .succ nj, σ, Δ, h =>
   let nj' := fundamental nj h
@@ -142,5 +179,11 @@ theorem fundamental : Γ ⊢ t : A -> Γ ⊨ t : A
   let sj' := fundamental sj h
   let nj' := fundamental nj h
   ℰ.nrec zj' sj' rfl nj'.1 nj'.2
+| .inl nj, σ, Δ, h =>
+  let nj' := fundamental nj h
+  ⟨Typing.inl nj'.1, SnNor.inl nj'.2⟩
+| .inr nj, σ, Δ, h =>
+  let nj' := fundamental nj h
+  ⟨Typing.inr nj'.1, SnNor.inr nj'.2⟩
 
 end StrongNormalization4

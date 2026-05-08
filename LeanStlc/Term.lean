@@ -7,6 +7,7 @@ inductive Ty : Type where
 | base : Ty
 | arrow : Ty -> Ty -> Ty
 | nat : Ty
+| plus : Ty -> Ty -> Ty
 
 notation "⊤" => Ty.base
 infixr:40 " -t> " => Ty.arrow
@@ -17,6 +18,7 @@ protected def Ty.repr (a : Ty) (p : Nat) : Std.Format :=
   | .arrow .base B => Ty.repr .base p ++ " -> " ++ Ty.repr B p
   | .arrow A B => "(" ++ Ty.repr A p ++ ") -> " ++ Ty.repr B p
   | .nat => "ℕ"
+  | .plus A B => "(" ++ Ty.repr A p ++ ") -> " ++ Ty.repr B p
 
 instance : Repr Ty where
   reprPrec := Ty.repr
@@ -28,6 +30,8 @@ inductive Term where
 | zero : Term
 | succ : Term -> Term
 | nrec : Ty -> Term -> Term -> Term -> Term
+| inl : Term -> Term
+| inr : Term -> Term
 
 protected def Term.repr (a : Term) (p : Nat) : Std.Format :=
   match a with
@@ -37,6 +41,8 @@ protected def Term.repr (a : Term) (p : Nat) : Std.Format :=
   | .zero => "'0"
   | .succ n => "S(" ++ Term.repr n p ++ ")"
   | .nrec A z s n => "(R " ++ Ty.repr A p ++ Term.repr z p ++ Term.repr s p ++ Term.repr n p ++ ")"
+  | .inl t => "inl" ++ Term.repr t p
+  | .inr t => "inr" ++ Term.repr t p
 
 instance : Repr Term where
   reprPrec := Term.repr
@@ -75,6 +81,8 @@ def Term.rmap (r : Ren) : Term -> Term
 | zero => zero
 | succ n => succ (rmap r n)
 | nrec A z s n => nrec A (rmap r z) (rmap r s) (rmap r n)
+| inl t => inl (rmap r t)
+| inr t => inr (rmap r t)
 
 instance : RenMap Term where
   rmap := Term.rmap
@@ -87,6 +95,8 @@ def Term.smap (σ : Subst Term) : Term -> Term
 | zero => zero
 | succ n => succ (smap σ n)
 | nrec A z s n => nrec A (smap σ z) (smap σ s) (smap σ n)
+| inl t => inl (smap σ t)
+| inr t => inr (smap σ t)
 
 instance SubstMap_Term : SubstMap Term Term where
   smap := Term.smap
@@ -108,6 +118,12 @@ theorem subst_succ : (Term.succ n)[σ] = Term.succ (n[σ]) := by simp [SubstMap.
 
 @[simp, grind =]
 theorem subst_nrec : (Term.nrec A z s n)[σ] = .nrec A (z[σ]) (s[σ]) (n[σ]) := by simp [SubstMap.smap]
+
+@[simp, grind =]
+theorem subst_inl : (Term.inl t)[σ] = .inl t[σ] := by simp [SubstMap.smap]
+
+@[simp, grind =]
+theorem subst_inr : (Term.inr t)[σ] = .inr t[σ] := by simp [SubstMap.smap]
 
 @[simp]
 theorem Term.from_action_compose {x} {σ τ : Subst Term}

@@ -17,6 +17,8 @@ inductive Red : Term -> Term -> Prop where
 | nrec1 : Red z z' -> Red (.nrec A z s n) (.nrec A z' s n)
 | nrec2 : Red s s' -> Red (.nrec A z s n) (.nrec A z s' n)
 | nrec3 : Red n n' -> Red (.nrec A z s n) (.nrec A z s n')
+| inl : Red t t' -> Red (.inl t) (.inl t')
+| inr : Red t t' -> Red (.inr t) (.inr t')
 
 infix:80 " ~> " => Red
 infix:81 " ~>* " => Star Red
@@ -54,6 +56,12 @@ inductive ParRed : Term -> Term -> Prop where
   ParRed s s' ->
   ParRed n n' ->
   ParRed (.nrec A z s (.succ n)) (s' :@ (.nrec A z' s' n'))
+| inl :
+  ParRed t t' ->
+  ParRed (.inl t) (.inl t')
+| inr :
+  ParRed t t' ->
+  ParRed (.inr t) (.inr t')
 
 infix:80 " ~p> " => ParRed
 infix:81 " ~p>* " => Star ParRed
@@ -72,6 +80,11 @@ namespace ParRed
       apply ParRed.succ ih
     case _ ih1 ih2 ih3 =>
       apply nrec ih1 ih2 ih3
+    case _ ih =>
+      apply ParRed.inl ih
+    case _ ih =>
+      apply ParRed.inr ih
+
 
   @[simp]
   def complete : Term -> Term
@@ -95,6 +108,8 @@ namespace ParRed
   | .zero => .zero
   | .succ n => .succ (complete n)
   | .nrec A z s n => .nrec A (complete z) (complete s) (complete n)
+  | .inl t => .inl (complete t)
+  | .inr t => .inr (complete t)
 
   theorem subst {t t'} (σ : Subst Term) :
     t ~p> t' ->
@@ -126,6 +141,14 @@ namespace ParRed
     case _ ih1 ih2 ih3 =>
       simp
       apply ParRed.nrec_succ; apply ih1; apply ih2; apply ih3
+    case _ h ih =>
+      simp
+      apply ParRed.inl
+      apply ih
+    case _ h ih =>
+      simp
+      apply ParRed.inr
+      apply ih
 
   theorem subst_action {x} {σ σ' : Subst Term} (r : Ren) :
     σ x ~ps> σ' x ->
@@ -218,6 +241,15 @@ namespace ParRed
         case _ =>
           replace ih3 := @ih3 (.succ n') σ σ' h1 (succ_subst j1)
           apply succ_subst2; apply ih3
+    case _ t ih =>
+      simp
+      cases h2
+      case _ j1 => simp; apply ParRed.inl; apply ih; apply h1; apply j1
+    case _ t ih =>
+      simp
+      cases h2
+      case _ j1 => simp; apply ParRed.inr; apply ih; apply h1; apply j1
+
 
 
   theorem triangle {t s} : t ~p> s -> s ~p> complete t := by
@@ -269,11 +301,21 @@ namespace ParRed
       case _ =>
         simp
         apply ParRed.nrec ih1 ih2 ih3
+      case _ =>
+        simp
+        apply ParRed.nrec ih1 ih2 ih3
+      case _ =>
+        simp
+        apply ParRed.nrec ih1 ih2 ih3
     case _ z z' s' s'' A h1 h2 ih1 ih2 =>
       apply ih1
     case _ A h1 h2 h3 ih1 ih2 ih3 =>
       apply ParRed.app ih2
       apply ParRed.nrec ih1 ih2 ih3
+    case _ h ih =>
+      apply ParRed.inl ih
+    case _ h ih =>
+      apply ParRed.inr ih
 
   instance : Substitutive ParRed where
     subst := subst
@@ -318,6 +360,14 @@ namespace Red
       apply ih1
     case _ ih1 =>
       simp; apply Red.nrec3; apply ih1
+    case _ h ih =>
+      simp
+      apply Red.inl
+      apply ih
+    case _ h ih =>
+      simp
+      apply Red.inr
+      apply ih
 
   theorem subst_action {x} {σ σ' : Subst Term} (r : Ren) :
     σ x ~s> σ' x ->
@@ -367,6 +417,10 @@ namespace Red
       apply ParRed.nrec (ParRed.refl) ih1 (ParRed.refl)
     case _ =>
       apply ParRed.nrec (ParRed.refl) (ParRed.refl); assumption
+    case _ h ih =>
+      apply ParRed.inl ih
+    case _ h ih =>
+      apply ParRed.inr ih
 
   theorem seqs_implies_pars {t t'} : t ~>* t' -> t ~p>* t' := by
     intro h; induction h
@@ -405,6 +459,12 @@ namespace Red
       apply Red.app1 j1; intro t1 t2 t2' j1; apply Red.app2 j1; apply Star.refl; apply Star.congr3; intro t1 t2 t3 t1' j1; apply Red.nrec1 j1
       intro t1 t2 t3 t2' j1; apply Red.nrec2 j1; intro t1 t2 t3 t3' j1; apply Red.nrec3 j1; apply ih1; apply ih2; apply ih3
       apply Star.congr2; intro t1 t2 t1' j1; apply Red.app1 j1; intro t1 t2 t2' j1; apply Red.app2 j1; apply ih2; apply Star.refl
+    case _ h ih =>
+      apply Star.congr1; intro t t'; intro h1; apply Red.inl h1
+      apply ih
+    case _ h ih =>
+      apply Star.congr1; intro t t'; intro h1; apply Red.inr h1
+      apply ih
 
   theorem pars_implies_seqs {t t'} : t ~p>* t' -> t ~>* t' := by
     intro h; induction h
@@ -507,6 +567,12 @@ namespace Red
     case _ A t t' t'' ih1 ih2 ih3 =>
       apply Star.congr3; intro t1 t2 t3 t1' h1; apply Red.nrec1 h1; intro t1 t2 t3 t2' h2; apply Red.nrec2 h2
       intro t1 t2 t3 t3' h1; apply Red.nrec3 h1; apply ih1 h; apply ih2 h; apply ih3 h
+    case _ t ih =>
+      apply Star.congr1; intro t t' h2; apply Red.inl h2
+      apply ih h
+    case _ t ih =>
+      apply Star.congr1; intro t t' h2; apply Red.inr h2
+      apply ih h
 
   theorem confluence {s t1 t2} : s ~>* t1 -> s ~>* t2 -> ∃ t, t1 ~>* t ∧ t2 ~>* t := by
     intro h1 h2

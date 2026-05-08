@@ -15,6 +15,8 @@ def Typing.preservation_step : Γ ⊢ t : A -> t ~> t' -> Γ ⊢ t' : A
 | nrec z s n, .nrec1 r => nrec (z.preservation_step r) s n
 | nrec z s n, .nrec2 r => nrec z (s.preservation_step r) n
 | nrec z s n, .nrec3 r => nrec z s (n.preservation_step r)
+| inl t, .inl r => inl (t.preservation_step r)
+| inr t, .inr r => inr (t.preservation_step r)
 
 def Typing.preservation (j : Γ ⊢ t : A) : t ~>* t' -> Γ ⊢ t' : A
 | .refl => j

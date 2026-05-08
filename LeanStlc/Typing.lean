@@ -26,6 +26,13 @@ inductive Typing : List Ty -> Term -> Ty -> Prop where
   Typing Γ s (A -t> A) ->
   Typing Γ n .nat ->
   Typing Γ (.nrec A z s n) A
+| inl :
+  Typing Γ t A ->
+  Typing Γ (.inl t) (.plus A B)
+| inr :
+  Typing Γ t B ->
+  Typing Γ (.inr t) (.plus A B)
+
 
 notation:170 Γ:170 " ⊢ " t:170 " : " A:170 => Typing Γ t A
 
@@ -89,6 +96,8 @@ def Typing.rename (m : Γ -⟨r⟩> Δ) : Γ ⊢ t : A -> Δ ⊢ t[r] : A
 | zero => zero
 | succ t => succ (t.rename m)
 | nrec z s n => nrec (z.rename m) (s.rename m) (n.rename m)
+| inl t => inl (t.rename m)
+| inr t => inr (t.rename m)
 
 -- theorem Typing.rename_old {Γ t A} Δ (r : Ren) :
 --   Γ ⊢ t : A ->
@@ -136,6 +145,35 @@ theorem TypingSubst.lift {Γ Δ : List Ty} A {σ : Subst Term} :
     have lem := Typing.rename (Δ := A::Δ) TypingRen.succ (j.act h)
     simp at lem; exact lem
 
+theorem variable_switch : Γ[n]? = some T <-> Γ ⊢ #n : T := by
+  apply Iff.intro
+  case _ =>
+    intro h
+    apply Typing.var h
+  case _ =>
+    intro h
+    cases h
+    case _ j =>
+      apply j
+
+theorem TypingSubst.comp : X -[σ]> Y -> Y -⟨r⟩> Z -> X -[σ ∘ r.to]> Z := by
+  intro j1 j2; apply mk; intro x T h
+  unfold Subst.compose
+  replace j1 := j1.act h
+  simp
+  generalize zdef : σ x = z
+  cases z
+  case _ n =>
+    simp
+    rw [zdef] at j1
+    have lem := variable_switch.2 j1
+    replace j2 := j2.act lem
+    apply variable_switch.1
+    apply j2
+  case _ =>
+    simp
+    apply Typing.rename; apply j2; rw [zdef] at j1; apply j1
+
 def Typing.subst (m : Γ -[σ]> Δ) : Γ ⊢ t : A -> Δ ⊢ t[σ] : A
 | var h => m.act h
 | app f a => app (f.subst m) (a.subst m)
@@ -143,6 +181,8 @@ def Typing.subst (m : Γ -[σ]> Δ) : Γ ⊢ t : A -> Δ ⊢ t[σ] : A
 | zero => zero
 | succ t => succ (t.subst m)
 | nrec z s n => nrec (z.subst m) (s.subst m) (n.subst m)
+| inl t => inl (t.subst m)
+| inr t => inr (t.subst m)
 
 theorem Typing.beta : (A::Γ) ⊢ b : B -> Γ ⊢ t : A -> Γ ⊢ b[.su t::+0] : B := by
   intro j1 j2
