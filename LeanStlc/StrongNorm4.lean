@@ -26,12 +26,17 @@ mutual
   | red : SnRed Γ S t t' -> SnNor Γ S t' -> SnNor Γ S t
   | inl : SnNor S1 Γ t -> SnNor S2 Γ t.inl
   | inr : SnNor S1 Γ t -> SnNor S2 Γ t.inr
+  | pair : SnNor S1 Γ a -> SnNor S2 Γ b -> SnNor S3 Γ (.pair a b)
+  | tt : SnNor Γ S .tt
 
   @[grind]
   inductive SnNeu : CtxSet -> CtxSet
   | var : SnNeu S Γ #x
   | app : SnNeu S1 Γ s -> SnNor S2 Γ t -> SnNeu S3 Γ (s :@ t)
   | nrec : SnNor S1 Γ z -> SnNor S2 Γ s -> SnNeu S3 Γ t -> SnNeu S4 Γ (.nrec A z s t)
+  | fst : SnNeu S1 Γ t -> SnNeu S2 Γ t.fst
+  | snd : SnNeu S1 Γ t -> SnNeu S2 Γ t.snd
+  | case : SnNeu S1 Γ d -> SnNor S2 (A :: Γ) a -> SnNor S2 (A :: Γ) b -> SnNeu S2 Γ (.case A d a b)
 
   @[grind]
   inductive SnRed : CtxSet -> CtxRel
@@ -40,6 +45,10 @@ mutual
   | succ : SnRed S Γ (.nrec A z s t.succ) (s :@ (.nrec A z s t))
   | step_app : SnRed S1 Γ s s' -> SnRed S2 Γ (s :@ t) (s' :@ t)
   | step_nrec : SnRed S1 Γ n n' -> SnRed S2 Γ (.nrec A z s n) (.nrec A z s n')
+  | fst : SnNor S1 Γ b -> SnRed S2 Γ (.fst (.pair a b)) a
+  | snd : SnNor S1 Γ a -> SnRed S2 Γ (.snd (.pair a b)) b
+  | inl : SnNor S1 Γ1 b -> SnRed S2 (A :: Γ2) (.case A (.inl t) a b) a[su t :: +0]
+  | inr : SnNor S1 Γ1 a -> SnRed S2 (A :: Γ2) (.case A (.inr t) a b) b[su t :: +0]
 end
 
 theorem SnRed.preservation : Γ ⊢ t : A -> SnRed S Γ t t' -> Γ ⊢ t' : A
@@ -48,6 +57,10 @@ theorem SnRed.preservation : Γ ⊢ t : A -> SnRed S Γ t t' -> Γ ⊢ t' : A
 | Typing.nrec j1 j2 (Typing.succ j3), .succ => Typing.app j2 (Typing.nrec j1 j2 j3)
 | Typing.nrec j1 _ _, .zero S1 h1 => j1
 | Typing.nrec j1 j2 j3, .step_nrec h1 => Typing.nrec j1 j2 (SnRed.preservation j3 h1)
+| Typing.fst (Typing.pair j1 _), fst j3 => j1
+| Typing.snd (Typing.pair _ j2), snd j3 => j2
+| Typing.case (.inl h1) h2 h3, inl h4 => Typing.beta h2 h1
+| Typing.case (.inr h1) _ h3, inr h5 => Typing.beta h3 h1
 
 mutual
   theorem SnNor.rename (m : Γ -⟨r⟩> Δ) : SnNor S Γ t -> SnNor S Δ t[r]
@@ -61,11 +74,19 @@ mutual
   | .red h t' => .red (h.rename m) (t'.rename m)
   | .inl t => .inl (t.rename m)
   | .inr t => .inr (t.rename m)
+  | .pair h1 h2 => .pair (h1.rename m) (h2.rename m)
+  | .tt => .tt
 
   theorem SnNeu.rename (m : Γ -⟨r⟩> Δ) : SnNeu S Γ t -> SnNeu S Δ t[r]
   | .var => .var
   | .app s t => .app (s.rename m) (t.rename m)
   | .nrec t z s => .nrec (t.rename m) (z.rename m) (s.rename m)
+  | .case (A := A) h1 h2 h3 =>
+    have lem1 := SnNeu.rename (m.lift A) h2
+    have lem2 := SnNeu.rename (m.lift A) h3
+    .case (h1.rename m) (sorry) (sorry)
+  | .snd h => .snd (h.rename m)
+  | .fst h => .fst (h.rename m)
 
   theorem SnRed.rename (m : Γ -⟨r⟩> Δ) : SnRed S Γ t t' -> SnRed S Δ t[r] t'[r]
   | @SnRed.beta S1 Γ t S2 A b th => by {
@@ -76,6 +97,10 @@ mutual
   | .succ => .succ
   | .step_app h => .step_app (h.rename m)
   | .step_nrec h => .step_nrec (h.rename m)
+  | .fst h => .fst (h.rename m)
+  | .snd h => .snd (h.rename m)
+  | .inl h => sorry
+  | .inr h => sorry
 end
 
 @[simp]
@@ -156,6 +181,18 @@ theorem ℰ.nrec :
 | ⟨j1, j2⟩, ⟨j3, j4⟩, eq, Typing.succ j5, .succ h1 => ⟨Typing.nrec j1 j3 (Typing.succ j5) , SnNor.red (SnRed.succ) (SnNor.appl rfl j3 j4 (ℰ.nrec ⟨j1, j2⟩ ⟨j3, j4⟩ eq j5 h1)).2⟩
 | ⟨j1, j2⟩, ⟨j3, j4⟩, _, j5, .neu h1 => ⟨Typing.nrec j1 j3 j5, SnNor.neu (SnNeu.nrec j2 j4 h1)⟩
 | ⟨j1, j2⟩, ⟨j3, j4⟩, eq, j5, .red h1 h2 => ⟨Typing.nrec j1 j3 j5, SnNor.red (SnRed.step_nrec h1) (ℰ.nrec ⟨j1, j2⟩ ⟨j3,j4⟩ eq (SnRed.preservation j5 h1) h2).2⟩
+| ⟨j1, j2⟩, ⟨j3, j4⟩, _, j5, .inl h => ⟨Typing.nrec j1 j3 j5, sorry⟩
+| ⟨j1, j2⟩, ⟨j3, j4⟩, _, j5, .inr h => ⟨Typing.nrec j1 j3 j5, sorry⟩
+
+theorem ℰ.case:
+  S = 𝒱 (.plus A B) ->
+  Γ ⊢ d : (.plus A B) ->
+  SnNor S Γ d ->
+  ℰ (A :: Γ) C a ->
+  ℰ (B :: Γ) C b ->
+  ℰ Γ C (Term.case C d a b)
+| eq, Typing.inl j1, j2, ⟨j3, j4⟩, ⟨j5, j6⟩ => ⟨Typing.case (Typing.inl j1) j3 j5, SnNor.red (SnRed.inl j6) sorry⟩
+| eq, j1, j2, ⟨j3, j4⟩, ⟨j5, j6⟩ => ⟨Typing.case (sorry) j3 j5, sorry⟩
 
 
 theorem fundamental : Γ ⊢ t : A -> Γ ⊨ t : A
@@ -185,5 +222,22 @@ theorem fundamental : Γ ⊢ t : A -> Γ ⊨ t : A
 | .inr nj, σ, Δ, h =>
   let nj' := fundamental nj h
   ⟨Typing.inr nj'.1, SnNor.inr nj'.2⟩
+| .case (A := A) (B := B) (C := C) h1 h2 h3, σ, Δ, h =>
+  let h1' := fundamental h1 h
+  let lem := SemSubst.lift h
+  let h2' := fundamental h2 (lem A)
+  let h3' := fundamental h3 (lem B)
+  (ℰ.case h1' h2' h3')
+| .fst nj, σ, Δ, h =>
+  let nj' := fundamental nj h
+  ⟨Typing.fst nj'.1, sorry⟩
+| .snd nj, σ, Δ, h =>
+  let nj' := fundamental nj h
+  ⟨Typing.snd nj'.1, sorry⟩
+| .pair h1 h2, σ, Δ, h =>
+  let h1' := fundamental h1 h
+  let h2' := fundamental h2 h
+  ⟨Typing.pair h1'.1 h2'.1, SnNor.pair h1'.2 h2'.2⟩
+| .tt, σ, Δ, h => ⟨Typing.tt, SnNor.tt⟩
 
 end StrongNormalization4

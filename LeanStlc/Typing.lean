@@ -32,6 +32,23 @@ inductive Typing : List Ty -> Term -> Ty -> Prop where
 | inr :
   Typing Γ t B ->
   Typing Γ (.inr t) (.plus A B)
+| case :
+  Typing Γ d (.plus A B) ->
+  Typing (A :: Γ) a C ->
+  Typing (B :: Γ) b C ->
+  Typing Γ (.case C d a b) C
+| fst :
+  Typing Γ t (.product A B) ->
+  Typing Γ t.fst A
+| snd :
+  Typing Γ t (.product A B) ->
+  Typing Γ t.snd B
+| pair :
+  Typing Γ a A ->
+  Typing Γ b B ->
+  Typing Γ (.pair a b) (.product A B)
+| tt :
+  Typing Γ .tt .unit
 
 
 notation:170 Γ:170 " ⊢ " t:170 " : " A:170 => Typing Γ t A
@@ -98,6 +115,15 @@ def Typing.rename (m : Γ -⟨r⟩> Δ) : Γ ⊢ t : A -> Δ ⊢ t[r] : A
 | nrec z s n => nrec (z.rename m) (s.rename m) (n.rename m)
 | inl t => inl (t.rename m)
 | inr t => inr (t.rename m)
+| case (A := A) (B := B) h1 h2 h3 =>
+  let h2' := h2.rename (m.lift A)
+  let h3' := h3.rename (m.lift B)
+  case (h1.rename m) (by rw [Ren.to_lift] at h2'; exact h2') ((by rw [Ren.to_lift] at h3'; exact h3') )
+| fst t => sorry
+| snd t => sorry
+| pair a b => sorry
+| tt => tt
+
 
 -- theorem Typing.rename_old {Γ t A} Δ (r : Ren) :
 --   Γ ⊢ t : A ->
@@ -183,6 +209,11 @@ def Typing.subst (m : Γ -[σ]> Δ) : Γ ⊢ t : A -> Δ ⊢ t[σ] : A
 | nrec z s n => nrec (z.subst m) (s.subst m) (n.subst m)
 | inl t => inl (t.subst m)
 | inr t => inr (t.subst m)
+| case h1 h2 h3 => sorry
+| fst t => sorry
+| snd t => sorry
+| pair a b => sorry
+| tt => tt
 
 theorem Typing.beta : (A::Γ) ⊢ b : B -> Γ ⊢ t : A -> Γ ⊢ b[.su t::+0] : B := by
   intro j1 j2

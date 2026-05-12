@@ -8,6 +8,9 @@ inductive Ty : Type where
 | arrow : Ty -> Ty -> Ty
 | nat : Ty
 | plus : Ty -> Ty -> Ty
+| product : Ty -> Ty -> Ty
+| empty : Ty
+| unit : Ty
 
 notation "⊤" => Ty.base
 infixr:40 " -t> " => Ty.arrow
@@ -18,7 +21,10 @@ protected def Ty.repr (a : Ty) (p : Nat) : Std.Format :=
   | .arrow .base B => Ty.repr .base p ++ " -> " ++ Ty.repr B p
   | .arrow A B => "(" ++ Ty.repr A p ++ ") -> " ++ Ty.repr B p
   | .nat => "ℕ"
-  | .plus A B => "(" ++ Ty.repr A p ++ ") -> " ++ Ty.repr B p
+  | .plus A B => "(" ++ Ty.repr A p ++ ") or " ++ Ty.repr B p
+  | .product A B => "(" ++ Ty.repr A p ++ ") and " ++ Ty.repr B p
+  | .empty => "⊥"
+  | .unit => "unit"
 
 instance : Repr Ty where
   reprPrec := Ty.repr
@@ -32,6 +38,11 @@ inductive Term where
 | nrec : Ty -> Term -> Term -> Term -> Term
 | inl : Term -> Term
 | inr : Term -> Term
+| case : Ty -> Term -> Term -> Term -> Term
+| fst : Term -> Term
+| snd : Term -> Term
+| pair : Term -> Term -> Term
+| tt : Term
 
 protected def Term.repr (a : Term) (p : Nat) : Std.Format :=
   match a with
@@ -43,6 +54,11 @@ protected def Term.repr (a : Term) (p : Nat) : Std.Format :=
   | .nrec A z s n => "(R " ++ Ty.repr A p ++ Term.repr z p ++ Term.repr s p ++ Term.repr n p ++ ")"
   | .inl t => "inl" ++ Term.repr t p
   | .inr t => "inr" ++ Term.repr t p
+  | .case _ t a b => "case" ++ Term.repr t p ++ Term.repr a p ++ Term.repr b p
+  | .fst t => "fst" ++ Term.repr t p
+  | .snd t => "snd" ++ Term.repr t p
+  | .pair a b => "pair" ++ Term.repr a p ++ Term.repr b p
+  | .tt => "tt"
 
 instance : Repr Term where
   reprPrec := Term.repr
@@ -83,6 +99,11 @@ def Term.rmap (r : Ren) : Term -> Term
 | nrec A z s n => nrec A (rmap r z) (rmap r s) (rmap r n)
 | inl t => inl (rmap r t)
 | inr t => inr (rmap r t)
+| case A d a b => case A (rmap r d) (rmap r.lift a) (rmap r.lift b)
+| fst t => fst (rmap r t)
+| snd t => snd (rmap r t)
+| pair a b => pair (rmap r a) (rmap r b)
+| tt => tt
 
 instance : RenMap Term where
   rmap := Term.rmap
@@ -97,6 +118,11 @@ def Term.smap (σ : Subst Term) : Term -> Term
 | nrec A z s n => nrec A (smap σ z) (smap σ s) (smap σ n)
 | inl t => inl (smap σ t)
 | inr t => inr (smap σ t)
+| case A d a b => case A (smap σ d) (smap σ.lift a) (smap σ.lift b)
+| fst t => fst (smap σ t)
+| snd t => snd (smap σ t)
+| pair a b => pair (smap σ a) (smap σ b)
+| tt => tt
 
 instance SubstMap_Term : SubstMap Term Term where
   smap := Term.smap
@@ -124,6 +150,21 @@ theorem subst_inl : (Term.inl t)[σ] = .inl t[σ] := by simp [SubstMap.smap]
 
 @[simp, grind =]
 theorem subst_inr : (Term.inr t)[σ] = .inr t[σ] := by simp [SubstMap.smap]
+
+@[simp, grind =]
+theorem subst_case : (Term.case A d a b)[σ] = .case A d[σ] a[σ.lift] b[σ.lift] := by simp [SubstMap.smap]
+
+@[simp, grind =]
+theorem subst_fst : (Term.fst t)[σ] = .fst t[σ] := by simp [SubstMap.smap]
+
+@[simp, grind =]
+theorem subst_snd: (Term.snd t)[σ] = .snd t[σ] := by simp [SubstMap.smap]
+
+@[simp, grind =]
+theorem subst_pair : (Term.pair a b)[σ] = .pair (a[σ]) (b[σ]) := by simp [SubstMap.smap]
+
+@[simp, grind =]
+theorem subst_tt : (Term.tt)[σ] = Term.tt := by simp [SubstMap.smap]
 
 @[simp]
 theorem Term.from_action_compose {x} {σ τ : Subst Term}
@@ -204,6 +245,7 @@ theorem ren_subst_apply_eq {t : Term} {r : Ren} {σ : Subst Term} :
   case lam A t ih =>
     replace ih := @ih r.lift σ.lift (ren_subst_apply_eq_lift h)
     grind
+  case case => sorry
   all_goals grind
 
 @[coe]

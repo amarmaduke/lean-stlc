@@ -17,6 +17,15 @@ def Typing.preservation_step : Γ ⊢ t : A -> t ~> t' -> Γ ⊢ t' : A
 | nrec z s n, .nrec3 r => nrec z s (n.preservation_step r)
 | inl t, .inl r => inl (t.preservation_step r)
 | inr t, .inr r => inr (t.preservation_step r)
+| case (inl h1) h2 h3, .case_inl => beta h2 h1
+| case (inr h1) h2 h3, .case_inr => beta h3 h1
+| case h1 h2 h3, .case1 r => Typing.case (Typing.preservation_step h1 r) h2 h3
+| case h1 h2 h3, .case2 r => Typing.case h1 (Typing.preservation_step h2 r) h3
+| case h1 h2 h3, .case3 r => Typing.case h1 h2 (Typing.preservation_step h3 r)
+| pair h1 h2, .pair1 r => Typing.pair (Typing.preservation_step h1 r) h2
+| pair h1 h2, .pair2 r => Typing.pair h1 (Typing.preservation_step h2 r)
+| fst (pair h1 h2), .fst => h1
+| snd (pair h1 h2), .snd => h2
 
 def Typing.preservation (j : Γ ⊢ t : A) : t ~>* t' -> Γ ⊢ t' : A
 | .refl => j
