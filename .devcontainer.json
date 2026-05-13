@@ -1,0 +1,17 @@
+{
+    "name" : "Lean STLC",
+    "image" : "mcr.microsoft.com/vscode/devcontainers/base:debian",
+    "customizations": {
+        "vscode": {
+            "extensions" : ["leanprover.lean4"]
+        },
+        "codespaces": {
+            "extensions" : ["leanprover.lean4"]
+        }
+    },
+
+    "workspaceMount": "source=${localWorkspaceFolder},target=/home/vscode/ps1,type=bind,consistency=delegated",
+    "workspaceFolder": "/home/vscode/ps1",
+
+    "remoteUser": "vscode"
+}
