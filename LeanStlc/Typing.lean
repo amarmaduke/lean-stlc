@@ -34,8 +34,8 @@ inductive Typing : List Ty -> Term -> Ty -> Prop where
   Typing Γ (.inr t) (.plus A B)
 | case :
   Typing Γ d (.plus A B) ->
-  Typing (A :: Γ) a C ->
-  Typing (B :: Γ) b C ->
+  Typing Γ a (A -t> C) ->
+  Typing Γ b (B -t> C) ->
   Typing Γ (.case C d a b) C
 | fst :
   Typing Γ t (.product A B) ->
@@ -115,10 +115,7 @@ def Typing.rename (m : Γ -⟨r⟩> Δ) : Γ ⊢ t : A -> Δ ⊢ t[r] : A
 | nrec z s n => nrec (z.rename m) (s.rename m) (n.rename m)
 | inl t => inl (t.rename m)
 | inr t => inr (t.rename m)
-| case (A := A) (B := B) h1 h2 h3 =>
-  let h2' := h2.rename (m.lift A)
-  let h3' := h3.rename (m.lift B)
-  case (h1.rename m) (by rw [Ren.to_lift] at h2'; exact h2') ((by rw [Ren.to_lift] at h3'; exact h3') )
+| case (A := A) (B := B) h1 h2 h3 => case (h1.rename m) (h2.rename m) (h3.rename m)
 | fst t => sorry
 | snd t => sorry
 | pair a b => sorry

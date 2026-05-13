@@ -19,8 +19,8 @@ inductive Red : Term -> Term -> Prop where
 | nrec3 : Red n n' -> Red (.nrec A z s n) (.nrec A z s n')
 | inl : Red t t' -> Red (.inl t) (.inl t')
 | inr : Red t t' -> Red (.inr t) (.inr t')
-| case_inl : Red (.case A (.inl t) a b) a[su t::+0]
-| case_inr : Red (.case A (.inr t) a b) b[su t::+0]
+| case_inl : Red (.case A (.inl t) a b) (a :@ t)
+| case_inr : Red (.case A (.inr t) a b) (b :@ t)
 | case1 : Red t t' -> Red (.case A t a b) (.case A t' a b)
 | case2 : Red a a' -> Red (.case A t a b) (.case A t a' b)
 | case3 : Red b b' -> Red (.case A t a b) (.case A t a b')
