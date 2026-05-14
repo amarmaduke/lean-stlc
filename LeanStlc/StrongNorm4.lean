@@ -67,7 +67,6 @@ theorem SnRed.preservation : Γ ⊢ t : A -> SnRed S Γ t t' -> Γ ⊢ t' : A
 | Typing.case h1 h2 h3, .step_case h4 => Typing.case (SnRed.preservation h1 h4) h2 h3
 | Typing.fst j1, .step_fst h => Typing.fst (SnRed.preservation j1 h)
 | Typing.snd j1, .step_snd h => Typing.snd (SnRed.preservation j1 h)
-| _, _ => sorry
 
 mutual
   theorem SnNor.rename (m : Γ -⟨r⟩> Δ) : SnNor S Γ t -> SnNor S Δ t[r]
@@ -79,7 +78,7 @@ mutual
   | .succ t => .succ (t.rename m)
   | .neu t => .neu (t.rename m)
   | .red h t' => .red (h.rename m) (t'.rename m)
-  | .inl h t => .inl (by intro r Δ' h'; sorry) (t.rename m)
+  | .inl h t => .inl (by intro r Δ' h'; replace h := h (TypingRen.comp m h'); simp at *; sorry) (t.rename m)
   | .inr h t => .inr sorry (t.rename m)
   | .pair h h1 h2 => .pair sorry (h1.rename m) (h2.rename m)
   | .tt => .tt
@@ -218,16 +217,16 @@ theorem ℰ.fst :
   SnNor (𝒱 A) Γ t.fst
 | eq, Typing.pair j1 j2, SnNor.pair h h1 h2 => SnNor.red (SnRed.fst h2) (by subst eq;simp only [ℛ] at h; replace h := @h id Γ TypingRen.id; simp at h; apply h.1.2)
 | eq, j1, SnNor.neu j2 => SnNor.neu (SnNeu.fst j2)
-| eq, j1, SnNor.red h j2 => SnNor.red (SnRed.step_fst h) (ℰ.fst rfl (SnRed.preservation j1 h) (by rw [eq] at j2; apply j2))
+| eq, j1, SnNor.red h j2 => SnNor.red (SnRed.step_fst h) (ℰ.fst eq (SnRed.preservation j1 h) j2)
 
 theorem ℰ.snd :
   S = 𝒱 (.product A B) ->
   Γ ⊢ t : (.product A B) ->
   SnNor S Γ t ->
   SnNor (𝒱 B) Γ t.snd
-| eq, Typing.pair j1 j2, SnNor.pair h h1 h2 => SnNor.red (SnRed.snd h2) (by subst eq;simp only [ℛ] at h; replace h := @h id Γ TypingRen.id; simp at h; apply h.2.2)
+| eq, Typing.pair j1 j2, SnNor.pair h h1 h2 => SnNor.red (SnRed.snd h1) (by subst eq;simp only [ℛ] at h; replace h := @h id Γ TypingRen.id; simp at h; apply h.2.2)
 | eq, j1, SnNor.neu j2 => SnNor.neu (SnNeu.snd j2)
-| eq, j1, SnNor.red h j2 => SnNor.red (SnRed.step_fst h) (ℰ.fst rfl (SnRed.preservation j1 h) (by rw [eq] at j2; apply j2))
+| eq, j1, SnNor.red h j2 => SnNor.red (SnRed.step_snd h) (ℰ.snd eq (SnRed.preservation j1 h) j2)
 
 theorem fundamental : Γ ⊢ t : A -> Γ ⊨ t : A
 | .var xj, σ, Δ, h => h.act xj
@@ -270,11 +269,19 @@ theorem fundamental : Γ ⊢ t : A -> Γ ⊨ t : A
   ⟨Typing.fst nj'.1, (ℰ.fst rfl nj'.1 nj'.2)⟩
 | .snd nj, σ, Δ, h =>
   let nj' := fundamental nj h
-  ⟨Typing.snd nj'.1, sorry⟩
-| .pair h1 h2, σ, Δ, h =>
+  ⟨Typing.snd nj'.1, (ℰ.snd rfl nj'.1 nj'.2)⟩
+| .pair (a := a) (b := b) (A := A) (B := B) h1 h2, σ, Δ, h =>
   let h1' := fundamental h1 h
   let h2' := fundamental h2 h
-  ⟨Typing.pair h1'.1 h2'.1, SnNor.pair sorry h1'.2 h2'.2⟩
+  let h1'' : Γ ⊨ a : A := fundamental h1
+  let h2'' : Γ ⊨ b : B := fundamental h2
+  have lem1 {Δ' r}: Δ -⟨r⟩> Δ' -> Δ' ⊢ a[σ][r.to] : A ∧ SnNor (𝒱 A) Δ' a[σ][r.to] := λ R =>
+  ⟨(h1'' (SemSubst.compose h R)).1 |> cast (by simp), (h1'' (SemSubst.compose h R)).2 |> cast (by simp)⟩
+  have lem2 {Δ' r}: Δ -⟨r⟩> Δ' -> Δ' ⊢ b[σ][r.to] : B ∧ SnNor (𝒱 B) Δ' b[σ][r.to] := λ R =>
+  ⟨(h2'' (SemSubst.compose h R)).1 |> cast (by simp), (h2'' (SemSubst.compose h R)).2 |> cast (by simp)⟩
+  ⟨Typing.pair h1'.1 h2'.1, SnNor.pair (λ R =>
+  ⟨⟨(lem1 R).1, (lem1 R).2⟩,
+   ⟨(lem2 R).1, (lem2 R).2⟩⟩) h1'.2 h2'.2⟩
 | .tt, σ, Δ, h => ⟨Typing.tt, SnNor.tt⟩
 
 end StrongNormalization4
