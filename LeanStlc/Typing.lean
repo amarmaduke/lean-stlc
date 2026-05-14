@@ -49,6 +49,9 @@ inductive Typing : List Ty -> Term -> Ty -> Prop where
   Typing Γ (.pair a b) (.product A B)
 | tt :
   Typing Γ .tt .unit
+| absurd :
+  Typing Γ t .empty ->
+  Typing Γ (.absurd A t) A
 
 
 notation:170 Γ:170 " ⊢ " t:170 " : " A:170 => Typing Γ t A
@@ -120,6 +123,7 @@ def Typing.rename (m : Γ -⟨r⟩> Δ) : Γ ⊢ t : A -> Δ ⊢ t[r] : A
 | snd t => sorry
 | pair a b => sorry
 | tt => tt
+| absurd h => absurd (h.rename m)
 
 
 -- theorem Typing.rename_old {Γ t A} Δ (r : Ren) :
@@ -211,6 +215,7 @@ def Typing.subst (m : Γ -[σ]> Δ) : Γ ⊢ t : A -> Δ ⊢ t[σ] : A
 | snd t => sorry
 | pair a b => sorry
 | tt => tt
+| absurd h => absurd (h.subst m)
 
 theorem Typing.beta : (A::Γ) ⊢ b : B -> Γ ⊢ t : A -> Γ ⊢ b[.su t::+0] : B := by
   intro j1 j2

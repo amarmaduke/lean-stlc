@@ -37,6 +37,7 @@ mutual
   | fst : SnNeu S1 Γ t -> SnNeu S2 Γ t.fst
   | snd : SnNeu S1 Γ t -> SnNeu S2 Γ t.snd
   | case : SnNeu S1 Γ d -> SnNor S2 Γ a -> SnNor S3 Γ b -> SnNeu S4 Γ (.case A d a b)
+  | absurd : SnNeu S1 Γ t -> SnNeu S2 Γ (.absurd A t)
 
   @[grind]
   inductive SnRed : CtxSet -> CtxRel
@@ -52,6 +53,7 @@ mutual
   | step_case : SnRed S1 Γ d d' -> SnRed S2 Γ (.case A d a b) (.case A d' a b)
   | step_fst : SnRed S1 Γ t t' -> SnRed S2 Γ (t.fst) (t'.fst)
   | step_snd : SnRed S1 Γ t t' -> SnRed S2 Γ (t.snd) (t'.snd)
+  | step_absurd : SnRed S1 Γ t t' -> SnRed S2 Γ (.absurd A t) (.absurd A t')
 end
 
 theorem SnRed.preservation : Γ ⊢ t : A -> SnRed S Γ t t' -> Γ ⊢ t' : A
@@ -67,6 +69,7 @@ theorem SnRed.preservation : Γ ⊢ t : A -> SnRed S Γ t t' -> Γ ⊢ t' : A
 | Typing.case h1 h2 h3, .step_case h4 => Typing.case (SnRed.preservation h1 h4) h2 h3
 | Typing.fst j1, .step_fst h => Typing.fst (SnRed.preservation j1 h)
 | Typing.snd j1, .step_snd h => Typing.snd (SnRed.preservation j1 h)
+| Typing.absurd j1, .step_absurd h => Typing.absurd (SnRed.preservation j1 h)
 
 mutual
   theorem SnNor.rename (m : Γ -⟨r⟩> Δ) : SnNor S Γ t -> SnNor S Δ t[r]
@@ -78,9 +81,15 @@ mutual
   | .succ t => .succ (t.rename m)
   | .neu t => .neu (t.rename m)
   | .red h t' => .red (h.rename m) (t'.rename m)
-  | .inl h t => .inl (by intro r Δ' h'; replace h := h (TypingRen.comp m h'); simp at *; sorry) (t.rename m)
-  | .inr h t => .inr sorry (t.rename m)
-  | .pair h h1 h2 => .pair sorry (h1.rename m) (h2.rename m)
+  | .inl (t := t) h tn =>
+    have lem {r' Δ'} : Δ -⟨r'⟩> Δ' → S Δ' t[r.to].inl[r'.to] := λ m' => h (m.comp m') |> cast (by simp)
+    .inl (t := t[r.to]) lem (tn.rename m)
+  | .inr (Γ := Γ') (t := t) h tn =>
+    have lem {r' Δ'} : Δ -⟨r'⟩> Δ' -> S Δ' t[r.to].inr[r'.to] := λ m' => h (m.comp m') |> cast (by simp)
+    .inr (t := t[r.to]) lem (tn.rename m)
+  | .pair (a := a) (b := b) h h1 h2 =>
+    have lem {r' Δ'}: Δ -⟨r'⟩> Δ' → S Δ' (a[↑r].pair b[r.to])[r'.to] := λ m' => h (m.comp m') |> cast (by simp)
+    .pair (a := a[r.to]) (b := b[r.to]) lem (h1.rename m) (h2.rename m)
   | .tt => .tt
 
   theorem SnNeu.rename (m : Γ -⟨r⟩> Δ) : SnNeu S Γ t -> SnNeu S Δ t[r]
@@ -91,6 +100,7 @@ mutual
     .case (h1.rename m) (h2.rename m) (h3.rename m)
   | .snd h => .snd (h.rename m)
   | .fst h => .fst (h.rename m)
+  | .absurd h => .absurd (h.rename m)
 
   theorem SnRed.rename (m : Γ -⟨r⟩> Δ) : SnRed S Γ t t' -> SnRed S Δ t[r] t'[r]
   | @SnRed.beta S1 Γ t S2 A b th => by {
@@ -108,6 +118,7 @@ mutual
   | .step_case h => .step_case (h.rename m)
   | .step_fst h => .step_fst (h.rename m)
   | .step_snd h => .step_snd (h.rename m)
+  | .step_absurd h => .step_absurd (h.rename m)
 end
 
 @[simp]
@@ -228,6 +239,14 @@ theorem ℰ.snd :
 | eq, j1, SnNor.neu j2 => SnNor.neu (SnNeu.snd j2)
 | eq, j1, SnNor.red h j2 => SnNor.red (SnRed.step_snd h) (ℰ.snd eq (SnRed.preservation j1 h) j2)
 
+theorem ℰ.absurd :
+  S = 𝒱 .empty ->
+  Γ ⊢ t : .empty ->
+  SnNor S Γ t ->
+  SnNor (𝒱 A) Γ (.absurd A t)
+| _, _, SnNor.neu j2 => SnNor.neu (SnNeu.absurd j2)
+| eq, j1, SnNor.red h j2 => SnNor.red (SnRed.step_absurd h) (ℰ.absurd eq (SnRed.preservation j1 h) j2)
+
 theorem fundamental : Γ ⊢ t : A -> Γ ⊨ t : A
 | .var xj, σ, Δ, h => h.act xj
 | .app fj aj, σ, Δ, h =>
@@ -283,5 +302,8 @@ theorem fundamental : Γ ⊢ t : A -> Γ ⊨ t : A
   ⟨⟨(lem1 R).1, (lem1 R).2⟩,
    ⟨(lem2 R).1, (lem2 R).2⟩⟩) h1'.2 h2'.2⟩
 | .tt, σ, Δ, h => ⟨Typing.tt, SnNor.tt⟩
+| .absurd m, σ, Δ, h =>
+  let nj' := fundamental m h
+  ⟨Typing.absurd nj'.1, ℰ.absurd rfl nj'.1 nj'.2⟩
 
 end StrongNormalization4

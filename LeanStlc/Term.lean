@@ -43,6 +43,7 @@ inductive Term where
 | snd : Term -> Term
 | pair : Term -> Term -> Term
 | tt : Term
+| absurd : Ty -> Term -> Term
 
 protected def Term.repr (a : Term) (p : Nat) : Std.Format :=
   match a with
@@ -59,6 +60,7 @@ protected def Term.repr (a : Term) (p : Nat) : Std.Format :=
   | .snd t => "snd" ++ Term.repr t p
   | .pair a b => "pair" ++ Term.repr a p ++ Term.repr b p
   | .tt => "tt"
+  | .absurd _ t => "absurd" ++ Term.repr t p
 
 instance : Repr Term where
   reprPrec := Term.repr
@@ -104,6 +106,7 @@ def Term.rmap (r : Ren) : Term -> Term
 | snd t => snd (rmap r t)
 | pair a b => pair (rmap r a) (rmap r b)
 | tt => tt
+| absurd A t => absurd A (rmap r t)
 
 instance : RenMap Term where
   rmap := Term.rmap
@@ -123,6 +126,7 @@ def Term.smap (σ : Subst Term) : Term -> Term
 | snd t => snd (smap σ t)
 | pair a b => pair (smap σ a) (smap σ b)
 | tt => tt
+| absurd A t => absurd A (smap σ t)
 
 instance SubstMap_Term : SubstMap Term Term where
   smap := Term.smap
@@ -165,6 +169,9 @@ theorem subst_pair : (Term.pair a b)[σ] = .pair (a[σ]) (b[σ]) := by simp [Sub
 
 @[simp, grind =]
 theorem subst_tt : (Term.tt)[σ] = Term.tt := by simp [SubstMap.smap]
+
+@[simp, grind =]
+theorem subst_absurd : (Term.absurd A t)[σ] = .absurd A t[σ] := by simp [SubstMap.smap]
 
 @[simp]
 theorem Term.from_action_compose {x} {σ τ : Subst Term}
